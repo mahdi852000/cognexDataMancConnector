@@ -1,7 +1,90 @@
-package org.example.akka.dmcc.actor;
+package org.example.akka.actor.dmcc;
 
+import akka.actor.typed.ActorRef;
+import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.AbstractBehavior;
+import static org.example.akka.message.CognexCommands.*;
 
-public class CognexDataManActor extends AbstractBehavior<CognexDataManActor.command> {
+import akka.actor.typed.javadsl.ActorContext;
+import akka.actor.typed.javadsl.Behaviors;
+import akka.actor.typed.javadsl.Receive;
+import org.example.akka.event.SystemEvent;
+import org.example.akka.message.CognexCommands;
+import org.example.akka.extra.IResource;
+
+
+
+
+import java.util.HashSet;
+import java.util.Set;
+
+
+public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
+
+    private final Set<ActorRef<SystemEvent.CognexEvent>> listeners = new HashSet<>();
+
+    private CognexDataManActor(ActorContext<CognexCommand> context) {
+        super(context);
+    }
+
+    public static Behavior<CognexCommand> create() {
+        return Behaviors.setup(CognexDataManActor::new);
+    }
+
+    @Override
+    public Receive<CognexCommand> createReceive() {
+        return newReceiveBuilder()
+                .onMessage(Start.class,this::onStart)
+                .onMessage(Stop.class, this::onStop)
+                .onMessage(Connect.class, this::onConnect)
+                .onMessage(Disconnect.class, this::onDisconnect)
+                .onMessage(SetOccupation.class, this::onSetOccupation)
+                .onMessage(RegisterListener.class, this::onRegisterListener)
+                .onMessage(UnregisterListener.class, this::onUnregisterListener)
+                .onMessage(NotifyScannedCode.class, this::onNotifyScannedCode)
+                .onMessage(CognexCommands.NotifyScannedCode.class, this::onNotifyScannedCode)
+                .build();
+    }
+
+    private Behavior<CognexCommand> onStart(Start msg) {
+        getContext().getLog().info("Received Start command");
+        return this;
+    }
+
+    private Behavior<CognexCommand> onStop(Stop msg) {
+        getContext().getLog().info("Received Stop command");
+        return this;
+    }
+
+    private Behavior<CognexCommand> onConnect(Connect msg) {
+        getContext().getLog().info("Received Connect command");
+        return this;
+    }
+
+    private Behavior<CognexCommand> onDisconnect(Disconnect msg) {
+        getContext().getLog().info("Received Disconnect command");
+        return this;
+    }
+
+    private Behavior<CognexCommand> onSetOccupation(SetOccupation msg) {
+        getContext().getLog().info("Received SetOccupation command with value: " + msg.occupied());
+        return this;
+    }
+
+    private Behavior<CognexCommand> onRegisterListener(CognexCommands.RegisterListener msg) {
+        listeners.add(msg.listener());
+        return this;
+    }
+
+    private Behavior<CognexCommand> onUnregisterListener(CognexCommands.UnregisterListener msg) {
+        listeners.remove(msg.listener());
+        return this;
+    }
+    private Behavior<CognexCommand> onNotifyScannedCode(CognexCommands.NotifyScannedCode msg) {
+        for(ActorRef<SystemEvent.CognexEvent> listener:listeners) {
+            listener.tell(new SystemEvent.CognexEvent.CodeScanned(msg.resource(),msg.code()));
+        }
+        return this;
+    }
 
 }

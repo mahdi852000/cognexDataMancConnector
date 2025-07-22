@@ -12,11 +12,16 @@ public class Response {
         this.response = response;
         this.checkSum = checkSum;
         this.id = id;
+        this.result=response;
     }
     public Response() {
         this.response = null;
         this.checkSum = false;
         this.status = 0;
+    }
+    public  Response id (Integer id){
+        this.id=id;
+        return this;
     }
     public String result() {
         return result;

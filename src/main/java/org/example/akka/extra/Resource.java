@@ -1,4 +1,6 @@
 package org.example.akka.extra;
 
-public interface Resource {
+import net.enilink.komma.core.IEntity;
+
+public interface Resource extends IEntity {
 }
