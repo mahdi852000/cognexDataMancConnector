@@ -4,6 +4,7 @@ import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.*;
 import org.example.akka.extra.DataManSystem;
+import org.example.akka.extra.FakeDataManSystem;
 import org.example.akka.message.RangeObserverCommand;
 import org.example.akka.message.Response;
 import org.example.akka.message.ScannerCommand;
@@ -83,6 +84,37 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                 .onMessage(RangeObserverCommand.ScanCode.class, this::onScanCode)
                 .build();
     }
+    // For Test Purpose
+    public static Behavior<RangeObserverCommand> createWithFakeSensor(
+            double simulatedDistance,
+            ActorRef<ScannerCommand> scannerActor,
+            ActorRef<String> scanReceiver,
+            Duration tickInterval) {
+
+        FakeDataManSystem fakeDmcc = new FakeDataManSystem(simulatedDistance);
+        return Behaviors.withTimers(timers ->
+                Behaviors.setup(ctx ->
+                        new RangeObserverActor(
+                                ctx,
+                                timers,
+                                fakeDmcc,
+                                0,
+                                10L,
+                                100L,
+                                120L,
+                                scannerActor,
+                                "fakeUri",
+                                "fakeHost",
+                                0,
+                                scanReceiver
+                        )
+                )
+        );
+    }
+
+
+
+
     private Behavior<RangeObserverCommand> onScanCode(RangeObserverCommand.ScanCode msg) {
         scanReceiver.tell(msg.code());
         getContext().getLog().info("Received scan code: {}",msg.code() );
@@ -90,7 +122,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
     }
 
     private Behavior<RangeObserverCommand> onStartObservingRange(RangeObserverCommand.StartObserving startObserving) {
-        timers.startTimerAtFixedRate(TICK_KEY, new RangeObserverCommand.Tick(), Duration.ofSeconds(5));
+        timers.startTimerAtFixedRate(TICK_KEY, new RangeObserverCommand.Tick(), Duration.ofSeconds(2));
         getContext().getLog().info("Range Observing Started");
         return this;
     }
@@ -125,6 +157,9 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     .filter(m -> m > 0)
                     .average()
                     .orElse(0.0);
+            //For debug
+            getContext().getLog().info("avg={}, rangeMin={}, rangeMax={}", avg, rangeMin, rangeMax);
+
 
             getContext().getLog().info("Avg(5)={}, measurement={}", avg, measurement);
 
@@ -134,6 +169,10 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     scannerActor.tell(new ScannerCommand.SetOccupation(true));
 
                     scanReceiver.tell(String.valueOf(measurement));
+
+                    //For Debug
+                    getContext().getLog().info("Trigger condition met. Sending TriggerScan...");
+
 
 
                     scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
@@ -146,7 +185,15 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     scannerActor.tell(new ScannerCommand.SetOccupation(false));
                     getContext().getLog().info("Occupation changed to OFF");
                 }
+
+
+                }
+            else {
+                //For debug
+                getContext().getLog().info("Trigger condition NOT met. No scan triggered.");
             }
+                //For debug
+            getContext().getLog().info("Tick received");
 
         } catch (Throwable t) {
             getContext().getLog().error("Error during range observation: {}", t.getMessage(), t);

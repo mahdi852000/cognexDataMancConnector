@@ -36,7 +36,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private SystemConnector.Listener listener;
     private final IResource delegate;
 
-    private ActorRef<RangeObserverCommand> rangeObserverActor = null;
+    private ActorRef<RangeObserverCommand> rangeObserverActor;
     private boolean isRangeObserving = false;
     private final String host;
     private final int port;
@@ -48,6 +48,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private final boolean isExternalDmcc;
 
     private final ActorRef<String> scanReceiver;
+
 
 
 
@@ -68,6 +69,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         this.cognexActor=cognexActor;
         this.isExternalDmcc = isExternalDmcc;
         this.scanReceiver=scanReceiver;
+
 
 
     }
@@ -110,13 +112,16 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 .onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
                 .onMessage(ScannerCommand.Disconnect.class, this::onDisconnect)
                 .onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation)
-                .onMessage(ScannerCommand.TriggerScan.class, msg -> {
-                    logger.info("Scanner triggered to scan.");
-                    // انجام عملیات دلخواه
-                    return Behaviors.same();
-                })
-
+                .onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
                 .build();
+    }
+
+    private Behavior<ScannerCommand>onTriggerScan(ScannerCommand.TriggerScan msg) {
+        logger.info("Scanner triggered to scan.");
+        // انجام عملیات دلخواه
+
+        rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
+        return Behaviors.same();
     }
 
     private Behavior<ScannerCommand>onQueryOccupation(ScannerCommand.QueryOccupation msg) {

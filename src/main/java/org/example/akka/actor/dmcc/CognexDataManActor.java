@@ -34,19 +34,18 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
     @Override
     public Receive<CognexCommand> createReceive() {
         return newReceiveBuilder()
-                .onMessage(Start.class,this::onStart)
+                /*.onMessage(Start.class,this::onStart)
                 .onMessage(Stop.class, this::onStop)
                 .onMessage(Connect.class, this::onConnect)
                 .onMessage(Disconnect.class, this::onDisconnect)
                 .onMessage(SetOccupation.class, this::onSetOccupation)
                 .onMessage(RegisterListener.class, this::onRegisterListener)
-                .onMessage(UnregisterListener.class, this::onUnregisterListener)
+                .onMessage(UnregisterListener.class, this::onUnregisterListener)*/
                 .onMessage(NotifyScannedCode.class, this::onNotifyScannedCode)
-                .onMessage(CognexCommands.NotifyScannedCode.class, this::onNotifyScannedCode)
                 .build();
     }
 
-    private Behavior<CognexCommand> onStart(Start msg) {
+ /*   private Behavior<CognexCommand> onStart(Start msg) {
         getContext().getLog().info("Received Start command");
         return this;
     }
@@ -79,7 +78,9 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
     private Behavior<CognexCommand> onUnregisterListener(CognexCommands.UnregisterListener msg) {
         listeners.remove(msg.listener());
         return this;
-    }
+    }*/
+
+    //This is the only Method which is used
     private Behavior<CognexCommand> onNotifyScannedCode(CognexCommands.NotifyScannedCode msg) {
         for(ActorRef<SystemEvent.CognexEvent> listener:listeners) {
             listener.tell(new SystemEvent.CognexEvent.CodeScanned(msg.resource(),msg.code()));

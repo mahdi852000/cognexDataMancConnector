@@ -356,7 +356,7 @@ public class ScannerActorTest {
         // تبدیل به نوع دقیق
         ScannerCommand.SetOccupation occ = scannerProbe.expectMessageClass(
                 ScannerCommand.SetOccupation.class,
-                Duration.ofSeconds(10)
+                Duration.ofSeconds(5)
         );
         // بررسی مقدار
         assertTrue(occ.occupied(), "Occupation should be ON based on simulated average height");
