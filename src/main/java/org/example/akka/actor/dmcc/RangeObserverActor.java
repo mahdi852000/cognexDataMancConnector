@@ -3,77 +3,43 @@ package org.example.akka.actor.dmcc;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.*;
+import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.extra.DataManSystem;
 import org.example.akka.extra.FakeDataManSystem;
 import org.example.akka.message.RangeObserverCommand;
 import org.example.akka.message.Response;
 import org.example.akka.message.ScannerCommand;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
 public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
 
 
-
+    private final RangeObserverConfig config;
     private final TimerScheduler<RangeObserverCommand> timers;
-    private final DataManSystem dmcc;
     private int cmId;
-    private final Long rangeMin, rangeMax, rangeOff;
     private final long[] measurements = new long[5];
     private int pos = 0;
-    private final ActorRef<ScannerCommand> scannerActor;
     private Boolean occupation = null;
-    private final  String uri;
-    private final String host;
-    private final int port;
-
     private static final Object TICK_KEY = new Object();
-    private final ActorRef<String> scanReceiver;
 
 
-
-
-    private RangeObserverActor(
-            ActorContext<RangeObserverCommand> context ,
+    private RangeObserverActor (
+            ActorContext<RangeObserverCommand> context,
             TimerScheduler<RangeObserverCommand> timers,
-            DataManSystem dmcc,
-            int cmId,
-            Long rangeMin,
-            Long rangeMax,
-            Long rangeOff,
-            ActorRef<ScannerCommand> scannerActor,
-            String uri,
-            String host,
-            int port,
-            ActorRef<String> scanReceiver)
-    {
+            RangeObserverConfig config) {
         super(context);
-        this.timers= timers;
-        this.dmcc = dmcc;
-        this.cmId = cmId;
-        this.rangeMin = rangeMin;
-        this.rangeMax = rangeMax;
-        this.rangeOff = rangeOff;
-        this.scannerActor = scannerActor;
-        this.host=host;
-        this.uri=uri;
-        this.port=port;
-        this.scanReceiver=scanReceiver;
-
+        this.timers = timers;
+        this.config = config;
+        this.cmId = config.cmId;
     }
-    public static Behavior<RangeObserverCommand> create(DataManSystem dmcc, int cmId
-    , Long rangeMin
-    , Long rangeMax
-    , Long rangeOff
-    , ActorRef<ScannerCommand> scannerActorRef,String uri, String host, int port,ActorRef<String> scanReceiver) {
+
+
+    public static Behavior<RangeObserverCommand> create(RangeObserverConfig config) {
         return Behaviors.withTimers(timers->
                 Behaviors.setup(
-                        ctx-> new RangeObserverActor(ctx, timers,dmcc,cmId,rangeMin
-                        ,rangeMax,rangeOff,scannerActorRef,uri,host,port,scanReceiver)));
+                        ctx-> new RangeObserverActor(ctx, timers,config)));
     }
-
 
     @Override
     public  Receive<RangeObserverCommand> createReceive() {
@@ -92,11 +58,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
             Duration tickInterval) {
 
         FakeDataManSystem fakeDmcc = new FakeDataManSystem(simulatedDistance);
-        return Behaviors.withTimers(timers ->
-                Behaviors.setup(ctx ->
-                        new RangeObserverActor(
-                                ctx,
-                                timers,
+        RangeObserverConfig config = new RangeObserverConfig(
                                 fakeDmcc,
                                 0,
                                 10L,
@@ -107,16 +69,15 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                                 "fakeHost",
                                 0,
                                 scanReceiver
-                        )
-                )
-        );
+                        );
+                return Behaviors.withTimers(timers->
+                        Behaviors.setup(ctx->
+                                new RangeObserverActor(ctx,timers,config)));
+
     }
 
-
-
-
     private Behavior<RangeObserverCommand> onScanCode(RangeObserverCommand.ScanCode msg) {
-        scanReceiver.tell(msg.code());
+        config.scanReceiver.tell(msg.code());
         getContext().getLog().info("Received scan code: {}",msg.code() );
         return this;
     }
@@ -127,8 +88,6 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
         return this;
     }
 
-
-
     private Behavior<RangeObserverCommand> onStopObservingRange(RangeObserverCommand.StopObserving stopObserving) {
         timers.cancel(TICK_KEY);
         getContext().getLog().info("Range Observing Stopped");
@@ -137,7 +96,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
 
     private Behavior<RangeObserverCommand> onTick(RangeObserverCommand.Tick tick) {
         try {
-            Response r = dmcc.sendCommand("GET HEIGHT-SENSOR.CURRENT-MEASUREMENT", cmId++, true);
+            Response r = config.dmcc.sendCommand("GET HEIGHT-SENSOR.CURRENT-MEASUREMENT", cmId++, true);
 
             if (r == null) {
                 getContext().getLog().warn("Received null Response from DMCC");
@@ -158,36 +117,36 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     .average()
                     .orElse(0.0);
             //For debug
-            getContext().getLog().info("avg={}, rangeMin={}, rangeMax={}", avg, rangeMin, rangeMax);
+            getContext().getLog().info("avg={}, rangeMin={}, rangeMax={}", avg, config.rangeMin, config.rangeMax);
 
 
             getContext().getLog().info("Avg(5)={}, measurement={}", avg, measurement);
 
-            if (rangeMin < avg && avg < rangeMax) {
+            if (config.rangeMin < avg && avg < config.rangeMax) {
                 if (occupation == null || !occupation) {
                     occupation = true;
-                    scannerActor.tell(new ScannerCommand.SetOccupation(true));
+                    config.scannerActor.tell(new ScannerCommand.SetOccupation(true));
 
-                    scanReceiver.tell(String.valueOf(measurement));
+                    config.scanReceiver.tell(String.valueOf(measurement));
 
-                    //For Debug
+                    //For Debugging
                     getContext().getLog().info("Trigger condition met. Sending TriggerScan...");
 
 
 
-                    scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
+                    config.scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
 
                     getContext().getLog().info("Occupation changed to ON");
                 }
-            } else if (avg > rangeOff) {
+            } else if (avg > config.rangeOff) {
                 if (occupation == null || occupation) {
                     occupation = false;
-                    scannerActor.tell(new ScannerCommand.SetOccupation(false));
+                    config.scannerActor.tell(new ScannerCommand.SetOccupation(false));
                     getContext().getLog().info("Occupation changed to OFF");
                 }
 
 
-                }
+            }
             else {
                 //For debug
                 getContext().getLog().info("Trigger condition NOT met. No scan triggered.");
@@ -197,11 +156,9 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
 
         } catch (Throwable t) {
             getContext().getLog().error("Error during range observation: {}", t.getMessage(), t);
-        }
+            }
 
-        getContext().getLog().info("Starting DMCC scanner at URI={} host={} port={}", uri, host, port);
-
+        getContext().getLog().info("Starting DMCC scanner at URI={} host={} port={}", config.uri, config.host, config.port);
         return this;
     }
-
 }

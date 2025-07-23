@@ -2,6 +2,7 @@ package org.example.akka.actor.dmcc;
 
 import akka.actor.typed.Terminated;
 
+import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.message.RangeObserverCommand;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
@@ -328,7 +329,11 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
 
     private Behavior<ScannerCommand> onStart(ScannerCommand.Start msg) {
+
         logger.info("Starting " + getBehaviourDelegate());
+
+
+
 
                 //((IReference) getBehaviourDelegate()).getURI().toString();
         IReference ref = ((IReference) getBehaviourDelegate() instanceof IReference) ? (IReference)
@@ -361,12 +366,13 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 return this;
             }
 
-
+            RangeObserverConfig rangeConfig = new RangeObserverConfig(
+                    dmcc, cmId, rangeMin, rangeMax, rangeOff,
+                    getContext().getSelf(), uri, host, port, scanReceiver
+            );
             if (rangeObserverActor == null) {
                 rangeObserverActor = getContext().spawn(
-                        RangeObserverActor.create(dmcc, cmId, rangeMin, rangeMax,
-                                rangeOff, getContext().getSelf(),uri,
-                                host,port,scanReceiver),
+                        RangeObserverActor.create(rangeConfig),
                         "rangeObserver-" + cmId
                 );
                 getContext().watch(rangeObserverActor);

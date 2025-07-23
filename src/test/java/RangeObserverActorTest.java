@@ -2,6 +2,7 @@ import akka.actor.testkit.typed.javadsl.*;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.javadsl.Behaviors;
 import org.example.akka.actor.dmcc.RangeObserverActor;
+import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.extra.DataManSystem;
 import org.example.akka.message.RangeObserverCommand;
 import org.example.akka.message.Response;
@@ -17,6 +18,14 @@ import static org.mockito.Mockito.*;
 class RangeObserverActorTest {
 
     private static ActorTestKit testKit;
+    private static final int cmId = 1;
+    private static final long rangeMin = 10L;
+    private static final long rangeMax = 100L;
+    private static final long rangeOff = 120L;
+    private static final String uri = "fakeUri";
+    private static final String host = "localhost";
+    private static final int port = 5000;
+
 
     @BeforeAll
     static void setup() {
@@ -49,20 +58,12 @@ class RangeObserverActorTest {
 
 
         // ساخت actor تحت تست با مقادیر ورودی فرضی
+        RangeObserverConfig config = new RangeObserverConfig(
+                dmccMock, cmId, rangeMin, rangeMax, rangeOff,
+                scannerProbe.getRef(), uri, host, port, scanReceiverProbe.getRef()
+        );
         ActorRef<RangeObserverCommand> rangeObserverActor = testKit.spawn(
-                RangeObserverActor.create(
-                        dmccMock,
-                        0,
-                        10L,
-                        100L,
-                        20L,
-                        scannerProbe.getRef(),
-                        "someUri",
-                        "someHost",
-                        1234,
-                        scanReceiverProbe.getRef()
-
-                )
+                RangeObserverActor.create(config)
         );
 
         // ارسال پیام StartObserving
@@ -104,11 +105,16 @@ class RangeObserverActorTest {
 
         DataManSystem dmcc = mock(DataManSystem.class);
 
+        RangeObserverConfig config = new RangeObserverConfig(
+                dmcc, 1, 100L, 200L, 300L,
+                scannerProbe.getRef(), "uri", "host", 1234, scanResultReceiver.getRef()
+
+        );
+
 
         // می‌سازیم actor اصلی با رفرنس‌های لازم
         ActorRef<RangeObserverCommand> observer = testKit.spawn(
-                RangeObserverActor.create(dmcc, 1, 100L, 200L, 300L,
-                        scannerProbe.getRef(), "uri", "host", 1234, scanResultReceiver.getRef())
+                RangeObserverActor.create(config)
         );
 
 

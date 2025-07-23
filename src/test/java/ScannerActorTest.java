@@ -4,6 +4,7 @@ import akka.actor.typed.ActorRef;
 import net.enilink.komma.core.*;
 import org.example.akka.actor.dmcc.RangeObserverActor;
 import org.example.akka.actor.dmcc.ScannerActor;
+import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.extra.IResource;
 import org.example.akka.extra.Request;
 import org.example.akka.extra.SystemConnector;
@@ -317,55 +318,43 @@ public class ScannerActorTest {
 
     @Test
     public void testRangeObserverToScannerActorIntegration() {
-        // شبیه‌سازی ارتفاع‌هایی که داخل محدوده‌اند (100 تا 160)، میانگین = 130
         long[] fakeHeights = { 120L, 130L, 140L };
-
         DummyDMCC dynamicDMCC = new DummyDMCC(fakeHeights);
         TestProbe<ScannerCommand> scannerProbe = testKit.createTestProbe(ScannerCommand.class);
-
         TestProbe<String> scanReceiverProbe = testKit.createTestProbe();
 
+        long rangeMin = 100L;
+        long rangeMax = 160L;
+        long rangeOff = 180L;
+        int cmId = 1;
+        String uri = "fakeUri";
+        String host = "localhost";
+        int port = 5000;
 
-        // ساخت بازیگر RangeObserver
+        RangeObserverConfig rangeConfig = new RangeObserverConfig(
+                dynamicDMCC, cmId, rangeMin, rangeMax, rangeOff,
+                scannerProbe.getRef(), uri, host, port, scanReceiverProbe.getRef()
+        );
+
         ActorRef<RangeObserverCommand> observer = testKit.spawn(
-                RangeObserverActor.create(
-                        dynamicDMCC,
-                        1,
-                        100L,     // RangeMin
-                        160L,     // RangeMax
-                        170L,     // RangeOff
-                        scannerProbe.getRef(), // مقصد SetOccupation
-                        "dummy-uri",
-                        "localhost",
-                        5000,
-                        scanReceiverProbe.getRef()
-                ),
+                RangeObserverActor.create(rangeConfig),
                 "RangeObserver-" + UUID.randomUUID()
         );
 
-        // شروع به رصد کردن
         observer.tell(new RangeObserverCommand.StartObserving());
 
-        // بررسی دریافت پیام SetOccupation(true) حداکثر ظرف 10 ثانیه
-        // منتظر یک پیام از نوع ScannerCommand (بدون بررسی مقدار)
-        /*ScannerCommand msg = scannerProbe.receiveMessage(Duration.ofSeconds(10));
-
-        // بررسی اینکه نوع پیام صحیح است
-        assertTrue(msg instanceof ScannerCommand.SetOccupation);*/
-
-        // تبدیل به نوع دقیق
         ScannerCommand.SetOccupation occ = scannerProbe.expectMessageClass(
                 ScannerCommand.SetOccupation.class,
                 Duration.ofSeconds(5)
         );
-        // بررسی مقدار
         assertTrue(occ.occupied(), "Occupation should be ON based on simulated average height");
 
         ScannerCommand.TriggerScan triggerScan = scannerProbe.expectMessageClass(
-                ScannerCommand.TriggerScan.class,Duration.ofSeconds(10)
+                ScannerCommand.TriggerScan.class, Duration.ofSeconds(10)
         );
         assertNotNull(triggerScan);
     }
+
 
     @Test
     public void testOnDisconnectShouldUpdateConnectionStatus() {
