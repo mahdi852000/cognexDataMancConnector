@@ -2,15 +2,12 @@ package org.example.akka.actor.dmcc;
 
 import akka.actor.typed.Terminated;
 
+import akka.actor.typed.javadsl.*;
 import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.config.ScannerActorConfig;
 import org.example.akka.message.RangeObserverCommand;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
-import akka.actor.typed.javadsl.AbstractBehavior;
-import akka.actor.typed.javadsl.ActorContext;
-import akka.actor.typed.javadsl.Behaviors;
-import akka.actor.typed.javadsl.Receive;
 import net.enilink.komma.core.IReference;
 import org.example.akka.extra.*;
 import org.example.akka.message.*;
@@ -81,37 +78,88 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
 
+    private ReceiveBuilder<ScannerCommand> connectionHandlers(ReceiveBuilder<ScannerCommand> builder) {
+        return builder
+                .onMessage(ScannerCommand.Connect.class, this::onConnect)
+                .onMessage(ScannerCommand.OnDisconnect.class, this::onOnDisconnect)
+                .onMessage(ScannerCommand.OnConnect.class, this::onOnConnect)
+                .onMessage(ScannerCommand.IsConnected.class, this::onIsConnected)
+                .onMessage(ScannerCommand.IsConnectedToDMCC.class, this::onIsConnectedToDMCC)
+                .onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
+                .onMessage(ScannerCommand.Disconnect.class, this::onDisconnect);
+    }
+
+    private ReceiveBuilder<ScannerCommand> scanHandlers(ReceiveBuilder<ScannerCommand> builder) {
+        return builder
+                .onMessage(ScannerCommand.Start.class, this::onStart)
+                .onMessage(ScannerCommand.Stop.class, this::onStop)
+                .onMessage(ScannerCommand.SendTrigger.class, this::onSendTrigger)
+                .onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
+                .onMessage(ScannerCommand.OnMessage.class, this::onOnMessage);
+    }
+
+    private ReceiveBuilder<ScannerCommand> listenerHandlers(ReceiveBuilder<ScannerCommand> builder) {
+        return builder
+                .onMessage(ScannerCommand.RegisterEventListener.class, this::onRegisterEventListener)
+                .onMessage(ScannerCommand.UnregisterEventListener.class, this::onUnregisterEventListener);
+    }
+
+    private ReceiveBuilder<ScannerCommand> occupationHandlers(ReceiveBuilder<ScannerCommand> builder) {
+        return builder
+                .onMessage(ScannerCommand.SetOccupation.class, this::onSetOccupation)
+                .onMessage(ScannerCommand.GetOccupation.class, this::onGetOccupation)
+                .onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation);
+    }
+
+    private ReceiveBuilder<ScannerCommand> miscHandlers(ReceiveBuilder<ScannerCommand> builder) {
+        return builder
+                .onMessage(ScannerCommand.Enqueue.class, this::onEnqueue)
+                .onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate);
+    }
+   // @Override
+  //  public Receive<ScannerCommand> createReceive2() {
+     //   return newReceiveBuilder()
+                //.onMessage(ScannerCommand.Connect.class, this::onConnect)
+                //.onMessage(ScannerCommand.OnDisconnect.class, this::onOnDisconnect)
+                //.onMessage(ScannerCommand.OnMessage.class, this::onOnMessage)
+                //.onMessage(ScannerCommand.Enqueue.class, this::onEnqueue)
+                //.onMessage(ScannerCommand.IsConnected.class, this::onIsConnected)
+                //.onMessage(ScannerCommand.IsConnectedToDMCC.class, this::onIsConnectedToDMCC)
+                //.onMessage(ScannerCommand.RegisterEventListener.class, this::onRegisterEventListener)
+                //.onMessage(ScannerCommand.UnregisterEventListener.class, this::onUnregisterEventListener)
+                //.onMessage(ScannerCommand.Start.class, this::onStart)
+                //.onMessage(ScannerCommand.Stop.class, this::onStop)
+                //.onMessage(ScannerCommand.SetOccupation.class, this::onSetOccupation)
+                //.onMessage(ScannerCommand.GetOccupation.class, this::onGetOccupation)
+                //.onMessage(ScannerCommand.SendTrigger.class, this::onSendTrigger)
+                //.onMessage(ScannerCommand.OnConnect.class, this::onOnConnect)
+                //.onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate)
+                //.onSignal(Terminated.class, this::onTerminated)
+                //.onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
+                //.onMessage(ScannerCommand.Disconnect.class, this::onDisconnect)
+                //.onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation)
+                //.onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
+       //         .build();
+   // }
 
     @Override
     public Receive<ScannerCommand> createReceive() {
-        return newReceiveBuilder()
-                .onMessage(ScannerCommand.Connect.class, this::onConnect)
-                .onMessage(ScannerCommand.OnDisconnect.class, this::onOnDisconnect)
-                .onMessage(ScannerCommand.OnMessage.class, this::onOnMessage)
-                .onMessage(ScannerCommand.Enqueue.class, this::onEnqueue)
-                .onMessage(ScannerCommand.IsConnected.class, this::onIsConnected)
-                .onMessage(ScannerCommand.IsConnectedToDMCC.class, this::onIsConnectedToDMCC)
-                .onMessage(ScannerCommand.RegisterEventListener.class, this::onRegisterEventListener)
-                .onMessage(ScannerCommand.UnregisterEventListener.class, this::onUnregisterEventListener)
-                .onMessage(ScannerCommand.Start.class, this::onStart)
-                .onMessage(ScannerCommand.Stop.class, this::onStop)
-                .onMessage(ScannerCommand.SetOccupation.class, this::onSetOccupation)
-                .onMessage(ScannerCommand.GetOccupation.class, this::onGetOccupation)
-                .onMessage(ScannerCommand.SendTrigger.class, this::onSendTrigger)
-                .onMessage(ScannerCommand.OnConnect.class, this::onOnConnect)
-                .onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate)
-                .onSignal(Terminated.class, this::onTerminated)
-                .onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
-                .onMessage(ScannerCommand.Disconnect.class, this::onDisconnect)
-                .onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation)
-                .onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
-                .build();
+        ReceiveBuilder<ScannerCommand> builder = newReceiveBuilder();
+        connectionHandlers(builder);
+        scanHandlers(builder);
+        listenerHandlers(builder);
+        occupationHandlers(builder);
+        miscHandlers(builder);
+
+        builder.onSignal(Terminated.class, this::onTerminated);
+
+        return builder.build();
     }
+
 
     private Behavior<ScannerCommand>onTriggerScan(ScannerCommand.TriggerScan msg) {
         logger.info("Scanner triggered to scan.");
-        // انجام عملیات دلخواه
-
+        // یا انجام عملیات دلخواه
         rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
         return Behaviors.same();
     }
