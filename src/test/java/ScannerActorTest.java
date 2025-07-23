@@ -16,6 +16,9 @@ import org.example.akka.extra.DataManSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
+import org.example.akka.config.ScannerActorConfig;
+
+
 import net.enilink.komma.core.IReference;
 
 import static org.mockito.Mockito.*;
@@ -43,19 +46,21 @@ public class ScannerActorTest {
     private ActorRef<ScannerCommand> spawnScannerActor(SystemConnector.Listener listener) {
         TestProbe<CognexCommands.CognexCommand> fakeCognexActor = testKit.createTestProbe();
 
-        return testKit.spawn(
-                ScannerActor.create(
-                        1,
-                        new DummyDMCC(),
-                        listener,
-                        new DummyResource(),
-                        "localhost",
-                        5000,
-                        fakeCognexActor.getRef(),
-                        true,
-                        scanReceiverProbe.getRef()
+        ScannerActorConfig config = new ScannerActorConfig(
+                1,
+                new DummyDMCC(),
+                listener,
+                new DummyResource(),
+                "localhost",
+                5000,
+                fakeCognexActor.getRef(),
+                true,
+                scanReceiverProbe.getRef(),
+                false // useCheckSum مقدار دلخواه
+        );
 
-                ),
+        return testKit.spawn(
+                ScannerActor.create(config),
                 "Scanner-" + UUID.randomUUID()
         );
     }
@@ -158,21 +163,24 @@ public class ScannerActorTest {
         TestProbe<String> scanReceiverProbe = testKit.createTestProbe();
 
 
-        scannerActor = testKit.spawn(
-                ScannerActor.create (
-                        1,
-                        new DummyDMCC(),
-                        new DummyListener(),
-                        mockResource, // ✅ حالا این همونی‌یه که ScannerActor می‌خواست
-                        "localhost",
-                        5000,
-                        fakeCognexActor.getRef(),
-                        true,
-                        scanReceiverProbe.getRef()
+        ScannerActorConfig config = new ScannerActorConfig(
+                1,
+                new DummyDMCC(),
+                new DummyListener(),
+                mockResource,
+                "localhost",
+                5000,
+                fakeCognexActor.getRef(),
+                true,
+                scanReceiverProbe.getRef(),
+                false // useCheckSum
+        );
 
-                ),
+        scannerActor = testKit.spawn(
+                ScannerActor.create(config),
                 "Scanner-" + UUID.randomUUID()
         );
+
 
         // تست اصلی
         scannerActor.tell(new ScannerCommand.OnConnect());

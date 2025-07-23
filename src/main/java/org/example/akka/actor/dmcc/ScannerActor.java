@@ -3,6 +3,7 @@ package org.example.akka.actor.dmcc;
 import akka.actor.typed.Terminated;
 
 import org.example.akka.config.RangeObserverConfig;
+import org.example.akka.config.ScannerActorConfig;
 import org.example.akka.message.RangeObserverCommand;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
@@ -30,6 +31,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Behaviour<IResource>, TcpConnector{
 
     protected static final Logger logger = LoggerFactory.getLogger(ScannerActor.class);
+
+    private final ScannerActorConfig config;
+
     private int cmId = 0;
     private DataManSystem dmcc;
     boolean heartbeat = false;
@@ -39,47 +43,34 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
     private ActorRef<RangeObserverCommand> rangeObserverActor;
     private boolean isRangeObserving = false;
-    private final String host;
-    private final int port;
+
     private boolean connected = false;
     private Collection<ScannerEventListener> listeners = new CopyOnWriteArrayList<>();
 
-    private final ActorRef<CognexCommands.CognexCommand> cognexActor;
+
     boolean useCheckSum = false;
-    private final boolean isExternalDmcc;
-
-    private final ActorRef<String> scanReceiver;
 
 
 
 
 
-    public ScannerActor(ActorContext<ScannerCommand> context, int cmId, DataManSystem dmcc,
-                        SystemConnector.Listener listener, IResource delegate, String host, int port,
-                        ActorRef<CognexCommands.CognexCommand> cognexActor, boolean isExternalDmcc,
-                        ActorRef<String> scanReceiver) {
+
+    public ScannerActor(ActorContext<ScannerCommand> context, ScannerActorConfig config) {
         super(context);
-        this.cmId = cmId;
-        this.dmcc = dmcc;
+        this.config=config;
+        this.dmcc = config.dmcc;
         this.heartbeat = false;
         this.occupation = null;
-        this.listener = listener;
-        this.delegate=delegate;
-        this.host=host;
-        this.port=port;
-        this.cognexActor=cognexActor;
-        this.isExternalDmcc = isExternalDmcc;
-        this.scanReceiver=scanReceiver;
-
-
+        this.listener = config.listener;
+        this.delegate=config.delegate;
+        this.connected=false;
+        this.isRangeObserving=false;
+        this.listeners= new CopyOnWriteArrayList<>();
 
     }
-    public static Behavior<ScannerCommand> create(int cmId, DataManSystem dmcc,
-                                                  SystemConnector.Listener listener, IResource delegate,String host
-            ,int port, ActorRef<CognexCommands.CognexCommand> cognexActor, boolean isExternalDmcc, ActorRef
-                                                  <String> scanReceiver)   {
+    public static Behavior<ScannerCommand> create(ScannerActorConfig config)   {
         return Behaviors.setup(ctx->
-                new ScannerActor(ctx,cmId,dmcc,listener,delegate,host,port, cognexActor,isExternalDmcc, scanReceiver));
+                new ScannerActor(ctx,config));
 
     }
 
@@ -270,7 +261,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
        // TcpSystemConnector conn = new TcpSystemConnector(host(),port()).useHeartBeat(heartbeat);
 
         if(!dmcc.connected()) {
-                if(isExternalDmcc){
+                if(config.isExternalDmcc){
                     getContext().getLog().info("External DMCC injected, skipping override.");
                 } else {
                     TcpSystemConnector conn = new TcpSystemConnector(host(), port()).useHeartBeat(heartbeat);
@@ -284,7 +275,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             public void onMessage(Response response) {
                 String code = response.result();
                 logger.info("gateway-scan got code={} at source{}", code, uri);
-                cognexActor.tell(new CognexCommands.NotifyScannedCode(getBehaviourDelegate(),code));
+                config.cognexActor.tell(new CognexCommands.NotifyScannedCode(getBehaviourDelegate(),code));
                 listeners.forEach(l ->
                         l.onCodeScanned(getBehaviourDelegate(),code));
             }
@@ -368,7 +359,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
             RangeObserverConfig rangeConfig = new RangeObserverConfig(
                     dmcc, cmId, rangeMin, rangeMax, rangeOff,
-                    getContext().getSelf(), uri, host, port, scanReceiver
+                    getContext().getSelf(), uri, config.host, config.port, config.scanReceiver
             );
             if (rangeObserverActor == null) {
                 rangeObserverActor = getContext().spawn(
@@ -405,11 +396,11 @@ public IResource getBehaviourDelegate() {
 
     @Override
     public String host() {
-        return this.host;
+        return this.config.host;
     }
 
     @Override
     public int port() {
-        return this.port;
+        return this.config.port;
     }
 }
