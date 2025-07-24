@@ -20,10 +20,8 @@ import org.example.akka.extra.TcpConnector;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-
-
 
 public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Behaviour<IResource>, TcpConnector{
 
@@ -44,12 +42,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private boolean connected = false;
     private Collection<ScannerEventListener> listeners = new CopyOnWriteArrayList<>();
 
-
     boolean useCheckSum = false;
-
-
-
-
 
 
     public ScannerActor(ActorContext<ScannerCommand> context, ScannerActorConfig config) {
@@ -70,7 +63,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 new ScannerActor(ctx,config));
 
     }
-
 
     private Behavior<ScannerCommand> onGetBehaviorDelegate(GetBehaviorDelegate msg) {
         Object delegate = ((Behaviour<IResource>) this).getBehaviourDelegate(); // اگه this کلاس ScannerActor بود
@@ -395,32 +387,41 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             }
             logger.info("UPTIME response = {}", r);
             // خواندن تنظیمات رنج
-            Long rangeMax = getProperty(Long.class, "triggerRangeMax");
-            Long rangeMin = getProperty(Long.class, "triggerRangeMin");
-            Long rangeOff = getProperty(Long.class, "triggerRangeOff");
+            Optional <Long> rangeMax = getProperty(Long.class, "triggerRangeMax");
+            Optional <Long> rangeMin = getProperty(Long.class, "triggerRangeMin");
+            Optional <Long> rangeOff = getProperty(Long.class, "triggerRangeOff");
 
             boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
             if (!checkRange) {
                 logger.info("Range check not configured");
                 return this;
             }
+            Optional<RangeObserverConfig> rangeConfigOpt =
+                    rangeMin.flatMap(min ->
+                            rangeMax.flatMap(max ->
+                                    rangeOff.map(off -> new RangeObserverConfig(
+                                            dmcc, cmId, min, max, off,
+                                            getContext().getSelf(), uri, config.host, config.port, config.scanReceiver
+                                    ))
+                            )
+                    );
 
-            RangeObserverConfig rangeConfig = new RangeObserverConfig(
-                    dmcc, cmId, rangeMin, rangeMax, rangeOff,
-                    getContext().getSelf(), uri, config.host, config.port, config.scanReceiver
-            );
-            if (rangeObserverActor == null) {
+            if (rangeConfigOpt.isPresent()) {
+                RangeObserverConfig rangeConfig = rangeConfigOpt.get();
                 rangeObserverActor = getContext().spawn(
                         RangeObserverActor.create(rangeConfig),
                         "rangeObserver-" + cmId
                 );
                 getContext().watch(rangeObserverActor);
                 logger.info("RangeObserverActor created");
+
+                rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
+                isRangeObserving = true;
+                logger.info("RangeObserverActor observing started");
+            } else {
+                logger.warn("Range observation skipped — one or more range properties were missing.");
             }
 
-            rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
-            isRangeObserving = true;
-            logger.info("RangeObserverActor observing started");
 
         } catch (Throwable t) {
             logger.error("Failed to start:", t);
@@ -428,14 +429,33 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
         // اطلاعات اتصال
     }
-    private <T> T getProperty(Class<T> clazz, String propertyName ) {
+
+    private <T> Optional<T> getProperty(Class<T> clazz, String propertyName) {
+        Object value = delegate.getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart(propertyName));
+        if (value == null) return Optional.empty();
+
+        try {
+            if (clazz == Long.class) {
+                return Optional.of(clazz.cast(Long.valueOf(value.toString())));
+            } else if (clazz == Boolean.class) {
+                return Optional.of(clazz.cast(Boolean.valueOf(value.toString())));
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to convert property {} to type {}", propertyName, clazz.getSimpleName(), e);
+        }
+
+        return Optional.empty();
+    }
+
+
+  /*  private <T> T getProperty(Class<T> clazz, String propertyName ) {
     Object value = ((IResource) getBehaviourDelegate()).getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart
             (propertyName));
     if (null== value) return null;
     if (clazz.isAssignableFrom(Long.class)) return (T) Long.valueOf(value.toString());
     if (clazz.isAssignableFrom(Boolean.class)) return (T) Boolean.valueOf(value.toString());
     return null;
-}
+} */
 
 @Override
 public IResource getBehaviourDelegate() {
