@@ -50,7 +50,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                 .onMessage(RangeObserverCommand.ScanCode.class, this::onScanCode)
                 .build();
     }
-    // For Test Purpose
+    // For Testing Purpose
     public static Behavior<RangeObserverCommand> createWithFakeSensor(
             double simulatedDistance,
             ActorRef<ScannerCommand> scannerActor,
@@ -148,10 +148,10 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
 
             }
             else {
-                //For debug
+                //For debugging purpose
                 getContext().getLog().info("Trigger condition NOT met. No scan triggered.");
             }
-                //For debug
+                //For debugging purpose
             getContext().getLog().info("Tick received");
 
         } catch (Throwable t) {

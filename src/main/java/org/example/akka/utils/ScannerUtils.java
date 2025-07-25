@@ -1,4 +1,4 @@
-package org.example.akka.util;
+package org.example.akka.utils;
 
 import net.enilink.komma.core.IReference;
 import org.example.akka.extra.IResource;
