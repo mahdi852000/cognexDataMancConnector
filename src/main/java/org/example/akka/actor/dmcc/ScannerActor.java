@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.example.akka.extra.TcpConnector;
 
-import org.example.akka.util.ScannerUtils;
+import org.example.akka.utils.ScannerUtils;
 
 
 import java.io.IOException;
@@ -298,7 +298,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         getContext().getLog().info("DMCC is connected");
 
         String uri =((IReference) getBehaviourDelegate()).getURI().toString();
-        heartbeat = Boolean.TRUE.equals(org.example.akka.util.ScannerUtils.getProperty(delegate,Boolean.class , "heartbeat"));
+        heartbeat = Boolean.TRUE.equals(org.example.akka.utils.ScannerUtils.getProperty(delegate,Boolean.class , "heartbeat"));
        // TcpSystemConnector conn = new TcpSystemConnector(host(),port()).useHeartBeat(heartbeat);
 
         if(!dmcc.connected()) {
@@ -382,9 +382,9 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             }
             logger.info("UPTIME response = {}", r);
             // خواندن تنظیمات رنج
-            Optional <Long> rangeMax = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMax");
-            Optional <Long> rangeMin = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
-            Optional <Long> rangeOff = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
+            Optional <Long> rangeMax = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMax");
+            Optional <Long> rangeMin = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
+            Optional <Long> rangeOff = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
 
             boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
             if (!checkRange) {
