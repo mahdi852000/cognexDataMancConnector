@@ -49,16 +49,19 @@ public class ScannerUtilsTest {
 
     @Test
     void testGetProperty_ReturnsEmptyIfNull() {
-        when(mockResource.getSingle(mockRef)).thenReturn(null);
+
+        IReference expectedRef = LOGISTICS.NAMAESPACE_URI.appendLocalPart("triggerRangeMax");
+        when(mockResource.getSingle(expectedRef)).thenReturn(null);
 
         Optional<Long> result = ScannerUtils.getProperty(mockResource, Long.class, "triggerRangeMax");
-
         assertFalse(result.isPresent());
     }
 
     @Test
     void testGetProperty_InvalidConversion() {
-        when(mockResource.getSingle(mockRef)).thenReturn("notANumber");
+        IReference expectedRef = LOGISTICS.NAMAESPACE_URI.appendLocalPart("notANumber");
+        when(mockResource.getSingle(expectedRef)).thenReturn("notANumber");
+
 
         Optional<Long> result = ScannerUtils.getProperty(mockResource, Long.class, "notANumber");
 
