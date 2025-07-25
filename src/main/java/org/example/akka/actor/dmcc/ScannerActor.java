@@ -14,9 +14,13 @@ import org.example.akka.message.*;
 import org.example.akka.message.Response;
 import org.example.akka.necessary.BehaviorDelegateResponse;
 import org.example.akka.necessary.GetBehaviorDelegate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.example.akka.extra.TcpConnector;
+
+import org.example.akka.util.ScannerUtils;
+
 
 import java.io.IOException;
 import java.util.Collection;
@@ -289,15 +293,12 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         }
         return this;
     }
-
-
-
     private Behavior<ScannerCommand> onOnConnect (ScannerCommand.OnConnect msg) {
         if(dmcc.connected()) return this;
         getContext().getLog().info("DMCC is connected");
 
         String uri =((IReference) getBehaviourDelegate()).getURI().toString();
-        heartbeat = Boolean.TRUE.equals(getProperty(Boolean.class , "heartbeat"));
+        heartbeat = Boolean.TRUE.equals(org.example.akka.util.ScannerUtils.getProperty(delegate,Boolean.class , "heartbeat"));
        // TcpSystemConnector conn = new TcpSystemConnector(host(),port()).useHeartBeat(heartbeat);
 
         if(!dmcc.connected()) {
@@ -356,15 +357,9 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
 
-
-
-
     private Behavior<ScannerCommand> onStart(ScannerCommand.Start msg) {
 
         logger.info("Starting " + getBehaviourDelegate());
-
-
-
 
                 //((IReference) getBehaviourDelegate()).getURI().toString();
         IReference ref = ((IReference) getBehaviourDelegate() instanceof IReference) ? (IReference)
@@ -387,9 +382,9 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             }
             logger.info("UPTIME response = {}", r);
             // خواندن تنظیمات رنج
-            Optional <Long> rangeMax = getProperty(Long.class, "triggerRangeMax");
-            Optional <Long> rangeMin = getProperty(Long.class, "triggerRangeMin");
-            Optional <Long> rangeOff = getProperty(Long.class, "triggerRangeOff");
+            Optional <Long> rangeMax = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMax");
+            Optional <Long> rangeMin = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
+            Optional <Long> rangeOff = org.example.akka.util.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
 
             boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
             if (!checkRange) {
@@ -430,7 +425,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         // اطلاعات اتصال
     }
 
-    private <T> Optional<T> getProperty(Class<T> clazz, String propertyName) {
+/*    public   <T> Optional<T> getProperty(Class<T> clazz, String propertyName) {
         Object value = delegate.getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart(propertyName));
         if (value == null) return Optional.empty();
 
@@ -445,8 +440,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         }
 
         return Optional.empty();
-    }
-
+    }*/
 
   /*  private <T> T getProperty(Class<T> clazz, String propertyName ) {
     Object value = ((IResource) getBehaviourDelegate()).getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart
