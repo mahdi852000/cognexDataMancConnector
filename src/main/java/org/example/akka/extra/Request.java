@@ -1,6 +1,6 @@
-    package org.example.akka.extra;
+package org.example.akka.extra;
 
-    import lombok.Getter;
+import lombok.Getter;
 
     public class Request {
 

@@ -1,6 +1,6 @@
 import akka.actor.testkit.typed.javadsl.*;
 import akka.actor.typed.ActorRef;
-import akka.actor.typed.javadsl.Behaviors;
+
 import org.example.akka.actor.dmcc.RangeObserverActor;
 import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.extra.DataManSystem;

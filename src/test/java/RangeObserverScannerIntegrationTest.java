@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class RangeObserverScannerIntegrationTest {
 
@@ -61,7 +60,8 @@ public class RangeObserverScannerIntegrationTest {
         scannerProbe.expectMessageClass(ScannerCommand.SetOccupation.class);
 
         TriggerScan msg = scannerProbe.expectMessageClass(TriggerScan.class);
-        System.out.println("Received TriggerScan: " + msg);
+
+        log.info("Received TriggerScan: {}", msg);
 
 
 

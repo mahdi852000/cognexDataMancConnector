@@ -1,7 +1,7 @@
 package org.example.akka.extra;
 
 import org.example.akka.message.Response;
-import org.example.akka.message.ScannerCommand;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,9 +80,6 @@ public class TcpSystemConnector implements SystemConnector {
             return true;
         }
     }
-
-
-
 
         @Override
         public boolean connected() {

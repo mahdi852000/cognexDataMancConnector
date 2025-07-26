@@ -23,6 +23,7 @@ import org.example.akka.utils.ScannerUtils;
 
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,6 +48,18 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private Collection<ScannerEventListener> listeners = new CopyOnWriteArrayList<>();
 
     boolean useCheckSum = false;
+
+    private enum ConnectionState {
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        RECONNECTING
+    }
+
+    private ConnectionState connectionState = ConnectionState.DISCONNECTED;
+    private int retryCount = 0;
+    private static final int MAX_RETRIES = 5;
+    private static final Duration RETRY_INTERVAL = Duration.ofSeconds(2);
 
 
     public ScannerActor(ActorContext<ScannerCommand> context, ScannerActorConfig config) {
@@ -198,23 +211,75 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
 
-    private Behavior<ScannerCommand> onOnDisconnect (ScannerCommand.OnDisconnect msg) {
+    private Behavior<ScannerCommand> onOnDisconnect(ScannerCommand.OnDisconnect msg) {
+        getContext().getLog().info("Handling OnDisconnect. Current state: {}", connectionState);
+
+        if (rangeObserverActor != null && isRangeObserving) {
+            rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
+            isRangeObserving = false;
+        }
+
+        if (dmcc != null && dmcc.connected()) {
+            dmcc.disconnect();
+            connected = false;
+            getContext().getLog().info("Disconnected from DMCC.");
+        }
+
+        connectionState = ConnectionState.RECONNECTING;
+        retryCount = 1;
+        scheduleReconnect();
+
+        return this;
+    }
+
+    //Old Version
+   /* private Behavior<ScannerCommand> onOnDisconnect (ScannerCommand.OnDisconnect msg) {
 
         getContext().getLog().info("Handling OnDisconnect...");
         connected=false;
         return this;
-    }
+    }*/
 
     private Behavior<ScannerCommand> onConnect (ScannerCommand.Connect msg) {
-        getContext().getLog().info("is connecting");
-        getContext().getLog().info("onConnect Called");
-        dmcc.connect();
-        if(dmcc.connect()) {
-            this.connected=true;
-            getContext().getLog().info("Hey DMCC is connected");
-        } else {
-            getContext().getLog().warn("DMCCC NOT connected");
+
+        getContext().getLog().info("onConnect() called. Current state: {}", connectionState);
+
+        //Old version
+        /*getContext().getLog().info("is connecting");
+        getContext().getLog().info("onConnect Called");*/
+
+
+        if(connectionState == ConnectionState.CONNECTED) {
+            getContext().getLog().info("Already connected. Ignoring connect request.");
+            return this;
         }
+        connectionState = ConnectionState.CONNECTING;
+        retryCount=0;
+        getContext().getLog().info("Attempting to connect...");
+
+        try {
+            dmcc.connect();
+            if (dmcc.connected()) {
+                connectionState = ConnectionState.CONNECTED;
+                this.connected = true;
+                getContext().getLog().info("Connected successfully.");
+            } else {
+                connectionState = ConnectionState.RECONNECTING;
+                retryCount = 1;
+                getContext().getLog().warn("Initial connection failed. Will retry...");
+                scheduleReconnect();
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+//        dmcc.connect();
+//        if(dmcc.connect()) {
+//            this.connected=true;
+//            getContext().getLog().info("Hey DMCC is connected");
+//        } else {
+//            getContext().getLog().warn("DMCCC NOT connected");
+//        }
         //this.connected = true;
         return this;
     }
@@ -450,6 +515,22 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     if (clazz.isAssignableFrom(Boolean.class)) return (T) Boolean.valueOf(value.toString());
     return null;
 } */
+
+    private void scheduleReconnect() {
+        if(retryCount>MAX_RETRIES) {
+            getContext().getLog().warn("Max reconnect attempts reached. Switching to DISCONNECTED.");
+            connectionState=ConnectionState.DISCONNECTED;
+            return;
+        }
+
+        getContext().getSystem().scheduler().scheduleOnce(
+                RETRY_INTERVAL,
+                ()->getContext().getSelf().tell(new ScannerCommand.Connect()),
+                        getContext().getSystem().executionContext());
+        getContext().getLog().info("Scheduled reconnect attempt {} after {} seconds",
+                retryCount, RETRY_INTERVAL.getSeconds());
+                retryCount++;
+    }
 
 @Override
 public IResource getBehaviourDelegate() {

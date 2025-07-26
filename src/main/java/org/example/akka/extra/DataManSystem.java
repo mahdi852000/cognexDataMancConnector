@@ -1,7 +1,5 @@
 package org.example.akka.extra;
-
 import org.example.akka.message.Response;
-
 import java.io.IOException;
 
 public class DataManSystem {
