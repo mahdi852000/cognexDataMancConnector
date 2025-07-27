@@ -55,16 +55,10 @@ public class RangeObserverScannerIntegrationTest {
         observer.tell(new RangeObserverCommand.StartObserving());
         Thread.sleep(2100);
 
-
-
         scannerProbe.expectMessageClass(ScannerCommand.SetOccupation.class);
 
         TriggerScan msg = scannerProbe.expectMessageClass(TriggerScan.class);
-
         log.info("Received TriggerScan: {}", msg);
-
-
-
 
         observer.tell(new RangeObserverCommand.StopObserving());
         scannerProbe.expectNoMessage(Duration.ofMillis(5000));

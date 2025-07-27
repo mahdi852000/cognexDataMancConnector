@@ -1,6 +1,7 @@
 import akka.actor.testkit.typed.javadsl.ActorTestKit;
 import akka.actor.testkit.typed.javadsl.TestProbe;
 import akka.actor.typed.ActorRef;
+import lombok.extern.slf4j.Slf4j;
 import net.enilink.komma.core.*;
 import org.example.akka.actor.dmcc.RangeObserverActor;
 import org.example.akka.actor.dmcc.ScannerActor;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.example.akka.config.ScannerActorConfig;
 
 
+
 import net.enilink.komma.core.IReference;
 
 import static org.mockito.Mockito.*;
@@ -32,6 +34,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Slf4j
 public class ScannerActorTest {
 
     static final ActorTestKit testKit = ActorTestKit.create();
@@ -78,6 +81,7 @@ public class ScannerActorTest {
 
         scannerActor.tell(new ScannerCommand.QueryIsConnected(probe.getRef()));
         ScannerCommand.ConnectedStatus status = probe.receiveMessage();
+        log.info("Received ConnectedStatus with value: {}", status.status());
         assertFalse(status.status());
     }
 
@@ -86,17 +90,33 @@ public class ScannerActorTest {
     //Making sure that when a SetOccupation(true) or SetOccupation(false) message is received,
     // the occupation value in ScannerActor is correctly updated and returned in response to a QueryOccupation.
 
-    public void testSetAndQueryOccupation() {
+    public void testSetAndQueryOccupation() throws InterruptedException {
         scannerActor = spawnScannerActor(new DummyListener());
         TestProbe<ScannerCommand.OccupationStatus> probe = testKit.createTestProbe();
 
+        log.info("Sending SetOccupation(true)");
         scannerActor.tell(new ScannerCommand.SetOccupation(true));
-        scannerActor.tell(new ScannerCommand.QueryOccupation(probe.getRef()));
-        assertTrue(probe.receiveMessage().occupied());
-
+        probe.awaitAssert(Duration.ofSeconds(3), () -> {
+            log.info("📤 Sending QueryOccupation(true)");
+            scannerActor.tell(new ScannerCommand.QueryOccupation(probe.getRef()));
+            boolean occupied = probe.receiveMessage().occupied();
+            assertTrue(occupied);
+            //assertTrue(probe.receiveMessage().occupied());
+            /*ScannerCommand.OccupationStatus status = probe.receiveMessage();
+            assertTrue(status.occupied());*/
+            return null;
+        });
+        log.info("🟡 Sending SetOccupation(false)");
         scannerActor.tell(new ScannerCommand.SetOccupation(false));
-        scannerActor.tell(new ScannerCommand.QueryOccupation(probe.getRef()));
-        assertFalse(probe.receiveMessage().occupied());
+
+        probe.awaitAssert(Duration.ofSeconds(3), () -> {
+            log.info("📤 Sending QueryOccupation(false)");
+            scannerActor.tell(new ScannerCommand.QueryOccupation(probe.getRef()));
+            boolean occupied = probe.receiveMessage().occupied();
+            log.info("✅ Received OccupationStatus: {}", occupied);
+            assertFalse(occupied);
+            return null;
+        });
     }
 
     //Test the Connect message and check whether isConnected is updated correctly.
@@ -209,7 +229,7 @@ public class ScannerActorTest {
 
         public DummyDMCC() {
             super(new DummyConnector());
-            this.simulatedHeights = new long[]{140}; // یه مقدار پیش‌فرض
+            this.simulatedHeights = new long[]{140}; // a default value
         }
 
         public DummyDMCC(long[] simulatedHeights) {

@@ -174,7 +174,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     }
 
     private Behavior<ScannerCommand>onQueryOccupation(ScannerCommand.QueryOccupation msg) {
-        msg.replyTo().tell(new ScannerCommand.OccupationStatus(occupation)); // This has been created for TEST purpose
+        msg.replyTo().tell(new ScannerCommand.OccupationStatus(occupation));// This has been created for TEST purpose
+        getContext().getLog().info("📥 [ScannerActor] Received QueryOccupation, responding with {}", occupation);
         return this;
     }
     private Behavior<ScannerCommand> onDisconnect(ScannerCommand.Disconnect msg) {
@@ -346,7 +347,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         if(rangeObserverActor !=null && isRangeObserving) {
             rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
             isRangeObserving=false;
-            logger.info("RangeObserverActor stopped");
+            getContext().getLog().info("RangeObserverActor stopped");
         }
         return Behaviors.same();
     }
@@ -363,7 +364,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         getContext().getLog().info("DMCC is connected");
 
         String uri =((IReference) getBehaviourDelegate()).getURI().toString();
-        heartbeat = Boolean.TRUE.equals(org.example.akka.utils.ScannerUtils.getProperty(delegate,Boolean.class , "heartbeat"));
+        heartbeat = Boolean.TRUE.equals(org.example.akka.utils.ScannerUtils.getProperty
+                (delegate,Boolean.class , "heartbeat"));
        // TcpSystemConnector conn = new TcpSystemConnector(host(),port()).useHeartBeat(heartbeat);
 
         if(!dmcc.connected()) {
