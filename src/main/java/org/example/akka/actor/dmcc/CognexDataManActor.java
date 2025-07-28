@@ -3,17 +3,12 @@ package org.example.akka.actor.dmcc;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.AbstractBehavior;
-import static org.example.akka.message.CognexCommands.*;
-
+import static org.example.akka.message.CognexCommand.*;
+import org.example.akka.message.CognexCommand;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import org.example.akka.event.SystemEvent;
-import org.example.akka.message.CognexCommands;
-import org.example.akka.extra.IResource;
-
-
-
 
 import java.util.HashSet;
 import java.util.Set;
@@ -81,7 +76,7 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
     }*/
 
     //This is the only Method which is used
-    private Behavior<CognexCommand> onNotifyScannedCode(CognexCommands.NotifyScannedCode msg) {
+    private Behavior<CognexCommand> onNotifyScannedCode(CognexCommand.NotifyScannedCode msg) {
         for(ActorRef<SystemEvent.CognexEvent> listener:listeners) {
             listener.tell(new SystemEvent.CognexEvent.CodeScanned(msg.resource(),msg.code()));
         }

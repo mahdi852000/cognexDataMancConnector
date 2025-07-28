@@ -33,7 +33,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     protected static final Logger logger = LoggerFactory.getLogger(ScannerActor.class);
 
     private final ScannerActorConfig config;
-
     private int cmId = 0;
     private DataManSystem dmcc;
     boolean heartbeat = false;
@@ -48,6 +47,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private Collection<ScannerEventListener> listeners = new CopyOnWriteArrayList<>();
 
     boolean useCheckSum = false;
+    public final ActorRef<CognexCommand> cognexActor;
+
 
     private enum ConnectionState {
         DISCONNECTED,
@@ -62,7 +63,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private static final Duration RETRY_INTERVAL = Duration.ofSeconds(2);
 
 
-    public ScannerActor(ActorContext<ScannerCommand> context, ScannerActorConfig config) {
+    public ScannerActor(ActorContext<ScannerCommand> context, ScannerActorConfig config,
+                        ActorRef<CognexCommand> cognexActor) {
         super(context);
         this.config=config;
         this.dmcc = config.dmcc;
@@ -73,11 +75,12 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         this.connected=false;
         this.isRangeObserving=false;
         this.listeners= new CopyOnWriteArrayList<>();
+        this.cognexActor = cognexActor;
 
     }
     public static Behavior<ScannerCommand> create(ScannerActorConfig config)   {
         return Behaviors.setup(ctx->
-                new ScannerActor(ctx,config));
+                new ScannerActor(ctx,config, config.cognexActor));
 
     }
 
@@ -264,6 +267,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 connectionState = ConnectionState.CONNECTED;
                 this.connected = true;
                 getContext().getLog().info("Connected successfully.");
+                cognexActor.tell(new CognexCommand.Connect());
+
             } else {
                 connectionState = ConnectionState.RECONNECTING;
                 retryCount = 1;
@@ -383,7 +388,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             public void onMessage(Response response) {
                 String code = response.result();
                 logger.info("gateway-scan got code={} at source{}", code, uri);
-                config.cognexActor.tell(new CognexCommands.NotifyScannedCode(getBehaviourDelegate(),code));
+                config.cognexActor.tell(new CognexCommand.NotifyScannedCode(getBehaviourDelegate(),code));
                 listeners.forEach(l ->
                         l.onCodeScanned(getBehaviourDelegate(),code));
             }

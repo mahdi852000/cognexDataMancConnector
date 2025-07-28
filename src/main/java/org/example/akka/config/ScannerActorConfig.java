@@ -13,10 +13,11 @@ public class ScannerActorConfig {
     public final IResource delegate;
     public final String host;
     public final int port;
-    public final ActorRef<CognexCommands.CognexCommand> cognexActor;
+    public final ActorRef<CognexCommand> cognexActor;
     public final boolean isExternalDmcc;
     public final ActorRef<String> scanReceiver;
     public final boolean useCheckSum;
+
 
     public ScannerActorConfig(
             int cmId,
@@ -25,7 +26,7 @@ public class ScannerActorConfig {
             IResource delegate,
             String host,
             int port,
-            ActorRef<CognexCommands.CognexCommand> cognexActor,
+            ActorRef<CognexCommand> cognexActor,
             boolean isExternalDmcc,
             ActorRef<String> scanReceiver,
             boolean useCheckSum
