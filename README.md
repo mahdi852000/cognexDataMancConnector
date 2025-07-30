@@ -1,38 +1,69 @@
 🔰 Overview
-This project demonstrates how to perform a reliability test on Akka Typed actors in Java, focusing on the interaction between a scanner and a range observer system. The goal is to verify consistent and correct behavior over time without relying on an external TCP mock server.
+This report presents the reliability testing of an Akka Typed actor in Java, specifically focusing on the RangeObserverActor. The aim is to ensure that this actor responds correctly and consistently to repeated control messages, such as Start, Stop, and Tick, under test conditions.
 ______________________________________________________________________________________________________________________________________________________________________________________________________
 
-🧱 Project Structure
-RangeObserverActor: Monitors environment and triggers scanning periodically.
+🧱 System Components
+RangeObserverActor: Reacts to environmental triggers using a TimerScheduler, sending simulated scan codes to a predefined receiver.
 
-ScannerActor: Simulates the scanner device’s behavior (real or fake).
+FakeDataManSystem: A test double used only to construct the actor under test.
 
-FakeDataManSystem: Test double for the scanner system to simulate responses.
-
-ScanReceiver: Test probe actor to receive and validate scan results.
-
-______________________________________________________________________________________________________________________________________________________________________________________________________
-
-🧪 Testing Goals
-Verify stable interaction between RangeObserverActor and ScannerActor over repeated cycles.
-
-Ensure that scanner commands and asynchronous scan code responses are handled reliably.
-
-Test timer-based triggers inside RangeObserverActor using Akka’s TimerScheduler.
-
-Remove dependency on external TCP mock servers by using FakeDataManSystem.
+ScanReceiver (TestProbe<String>): A probe that receives messages and validates their content
 
 ______________________________________________________________________________________________________________________________________________________________________________________________________
 
-🛠 Implementation Notes
-Implemented in Java using Akka Typed API.
+🧪 Testing Objectives
+Validate that RangeObserverActor handles Start, Stop, and Tick messages in a reliable and repeatable way.
 
-Uses TimerScheduler for periodic triggering in RangeObserverActor.
+Confirm that timer-based triggering produces the expected number of scan code messages.
 
-Employs TestProbe to verify actor messages and interactions.
+Verify that scan messages are only sent when the actor is in the correct running state.
 
-Supports dependency injection of FakeDataManSystem for test flexibility.
+Ensure that stopping the actor halts further message production.
 
+______________________________________________________________________________________________________________________________________________________________________________________________________
+
+🛠 Implementation Details
+Implemented in Java using Akka Typed API (version 2.8.4).
+
+Used Akka’s TimerScheduler for periodic execution inside the actor.
+
+TestProbe<String> verifies that the expected scan messages are received.
+
+The FakeDataManSystem is used to instantiate the actor but plays no active role in logic during this test.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔍 Challenges
+Timer control in tests: Ensuring timers fired predictably and did not overlap with stop commands was a key challenge.
+
+Clean shutdown behavior: Verifying that the actor stopped emitting scan codes immediately after receiving a Stop message required precise timing.
+
+State validation: Making sure that scan messages were only sent in the correct running state (after Start) and ignored in the stopped state.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+📊 Results
+The RangeObserverActor reliably produced scan messages after Start and stopped producing them after receiving Stop.
+
+No scan messages were received while the actor was in the stopped state.
+
+The actor behaved deterministically during multiple start-stop cycles, proving its reliability under repeated command sequences.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________
+
+💡 Future work
+
+Add edge-case tests: Include more scenarios such as sending Start multiple times or sending Stop before any Start.
+
+Parameterize scan intervals: Make timer delay configurable for better test control.
+
+Consider state introspection: Add logging or state inspection tools to simplify actor testing in complex systems.
+
+Test under load: Evaluate the actor’s behavior under high-frequency tick simulations to test performance limits.
 
 ______________________________________________________________________________________________________________________________________________________________________________________________________
  
