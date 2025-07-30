@@ -56,7 +56,6 @@ class RangeObserverActorTest {
 
         TestProbe<String> scanReceiverProbe = testKit.createTestProbe();
 
-
         // ساخت actor تحت تست با مقادیر ورودی فرضی
         RangeObserverConfig config = new RangeObserverConfig(
                 dmccMock, cmId, rangeMin, rangeMax, rangeOff,
@@ -91,8 +90,6 @@ class RangeObserverActorTest {
         // verify اینکه sendCommand حداقل یکبار صدا زده شده
         verify(dmccMock, atLeastOnce()).sendCommand(anyString(), anyInt(), anyBoolean());
     }
-
-
     @Test
     void testRangeObserverReceivesScanCode() {
        // TestKitJunitResource testKit = new TestKitJunitResource();
@@ -110,14 +107,10 @@ class RangeObserverActorTest {
                 scannerProbe.getRef(), "uri", "host", 1234, scanResultReceiver.getRef()
 
         );
-
-
         // می‌سازیم actor اصلی با رفرنس‌های لازم
         ActorRef<RangeObserverCommand> observer = testKit.spawn(
                 RangeObserverActor.create(config)
         );
-
-
        // observer.tell(new RangeObserverCommand.StartObserving());
 
         // شبیه‌سازی دریافت scan code از ScannerActor

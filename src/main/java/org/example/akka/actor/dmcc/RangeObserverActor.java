@@ -41,6 +41,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                         ctx-> new RangeObserverActor(ctx, timers,config)));
     }
 
+
     @Override
     public  Receive<RangeObserverCommand> createReceive() {
         return newReceiveBuilder()
@@ -50,13 +51,25 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                 .onMessage(RangeObserverCommand.ScanCode.class, this::onScanCode)
                 .build();
     }
-    // For Testing Purpose
+    /**
+     * Creates a RangeObserverActor behavior for testing purposes using a fake sensor system.
+     * <p>
+     * This factory method constructs a RangeObserverActor configured with a FakeDataManSystem
+     * that simulates a fixed distance value. It allows testing the actor's behavior without
+     * requiring a real sensor device.
+     *
+     * @param simulatedDistance the fixed distance value the fake sensor will simulate
+     * @param scannerActor the actor reference to the scanner actor
+     * @param scanReceiver the actor reference to receive scanned code strings
+     * @param tickInterval the interval duration for timer ticks (not used directly here but can be used if needed)
+     * @return a Behavior instance of RangeObserverActor configured with the fake sensor system
+     */
+
     public static Behavior<RangeObserverCommand> createWithFakeSensor(
             double simulatedDistance,
             ActorRef<ScannerCommand> scannerActor,
             ActorRef<String> scanReceiver,
             Duration tickInterval) {
-
         FakeDataManSystem fakeDmcc = new FakeDataManSystem(simulatedDistance);
         RangeObserverConfig config = new RangeObserverConfig(
                                 fakeDmcc,
@@ -116,7 +129,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     .filter(m -> m > 0)
                     .average()
                     .orElse(0.0);
-            //For debug
+            // Debug: Logging average and configured range boundaries
             getContext().getLog().info("avg={}, rangeMin={}, rangeMax={}", avg, config.rangeMin, config.rangeMax);
 
 
@@ -129,10 +142,8 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
 
                     config.scanReceiver.tell(String.valueOf(measurement));
 
-                    //For Debugging
+                    // Debug: Trigger condition met, initiating scan sequence
                     getContext().getLog().info("Trigger condition met. Sending TriggerScan...");
-
-
 
                     config.scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
 
@@ -144,14 +155,12 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     config.scannerActor.tell(new ScannerCommand.SetOccupation(false));
                     getContext().getLog().info("Occupation changed to OFF");
                 }
-
-
             }
             else {
-                //For debugging purpose
+                // Debug: Trigger condition not satisfied; scan will not be initiated
                 getContext().getLog().info("Trigger condition NOT met. No scan triggered.");
             }
-                //For debugging purpose
+            // Debug: Tick event received, verifying periodic trigger
             getContext().getLog().info("Tick received");
 
         } catch (Throwable t) {

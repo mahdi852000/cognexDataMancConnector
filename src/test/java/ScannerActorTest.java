@@ -1,6 +1,8 @@
 import akka.actor.testkit.typed.javadsl.ActorTestKit;
 import akka.actor.testkit.typed.javadsl.TestProbe;
 import akka.actor.typed.ActorRef;
+import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.Behaviors;
 import lombok.extern.slf4j.Slf4j;
 import net.enilink.komma.core.*;
 import org.example.akka.actor.dmcc.RangeObserverActor;
@@ -173,8 +175,60 @@ public class ScannerActorTest {
         assertNotNull(triggerScan);
     }
 
-    // Dummy implementations
+    @Test
+    void testOnDisconnectShouldCleanupResources() {
+        // ایجاد test probes
+        TestProbe<RangeObserverCommand> rangeObserverProbe = testKit.createTestProbe();
+        TestProbe<CognexCommand> cognexProbe = testKit.createTestProbe();
 
+        // mock کردن وابستگی‌ها
+        DataManSystem dmccMock = mock(DataManSystem.class);
+        SystemConnector.Listener listenerMock = mock(SystemConnector.Listener.class);
+        IResource delegateMock = mock(IResource.class);
+
+        // شبیه‌سازی وضعیت وصل بودن
+        when(dmccMock.connected()).thenReturn(true);
+
+        // ساخت config
+        ScannerActorConfig config = new ScannerActorConfig(
+                41,
+                dmccMock,
+                listenerMock,
+                delegateMock,
+                "localhost",
+                1234,
+                cognexProbe.getRef(),
+                false,
+                scanReceiverProbe.getRef(),
+                false
+    );
+        // ساخت بازیگر
+        Behavior<ScannerCommand> behavior = Behaviors.setup(ctx ->
+                new ScannerActor(ctx, config, cognexProbe.getRef()) {
+                    {
+                        // مقداردهی دستی به وضعیت برای تست
+                        this.connected = true;
+                        this.rangeObserverActor = rangeObserverProbe.getRef();
+                        this.isRangeObserving = true;
+                    }
+                }
+        );
+        ActorRef<ScannerCommand> actor = testKit.spawn(behavior);
+
+        // ارسال پیام Disconnect
+        actor.tell(new ScannerCommand.Disconnect());
+
+        // بررسی ارسال StopObserving به rangeObserver
+        rangeObserverProbe.expectMessageClass(RangeObserverCommand.StopObserving.class);
+
+        // بررسی فراخوانی removeListener و disconnect
+        verify(dmccMock).removeListener(listenerMock);
+        verify(dmccMock).disconnect();
+        // چون فیلد connected خصوصی‌ست، مستقیم نمی‌شه بررسی کرد، اما می‌تونیم فرض کنیم اگر
+        // disconnect و removeListener صدا زده شده، کار انجام شده
+    }
+
+    // Dummy implementations
     static class DummyListener implements SystemConnector.Listener {
         public void onMessage(Response response) {}
         public void onConnect() {}

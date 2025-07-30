@@ -1,11 +1,8 @@
 package org.example.akka.actor.dmcc;
 
 import akka.actor.typed.Terminated;
-
 import akka.actor.typed.javadsl.*;
-import org.example.akka.config.RangeObserverConfig;
-import org.example.akka.config.ScannerActorConfig;
-import org.example.akka.message.RangeObserverCommand;
+
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import net.enilink.komma.core.IReference;
@@ -14,13 +11,14 @@ import org.example.akka.message.*;
 import org.example.akka.message.Response;
 import org.example.akka.necessary.BehaviorDelegateResponse;
 import org.example.akka.necessary.GetBehaviorDelegate;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.example.akka.config.RangeObserverConfig;
+import org.example.akka.config.ScannerActorConfig;
 import org.example.akka.extra.TcpConnector;
+import org.example.akka.message.RangeObserverCommand;
 
 import org.example.akka.utils.ScannerUtils;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -40,14 +38,18 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private SystemConnector.Listener listener;
     private final IResource delegate;
 
-    private ActorRef<RangeObserverCommand> rangeObserverActor;
-    private boolean isRangeObserving = false;
+    // Exposed as protected for testing purposes (e.g., to inject mocks or verify state)
+    protected ActorRef<RangeObserverCommand> rangeObserverActor;
+    protected boolean isRangeObserving = false;
 
-    private boolean connected = false;
+    // Protected for testing purposes (e.g., to mock or verify connection state)
+    protected boolean connected = false;
     private Collection<ScannerEventListener> listeners = new CopyOnWriteArrayList<>();
 
     boolean useCheckSum = false;
     public final ActorRef<CognexCommand> cognexActor;
+
+    private boolean isStarted = false;
 
 
     private enum ConnectionState {
@@ -85,10 +87,20 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     }
 
     private Behavior<ScannerCommand> onGetBehaviorDelegate(GetBehaviorDelegate msg) {
-        Object delegate = ((Behaviour<IResource>) this).getBehaviourDelegate(); // اگه this کلاس ScannerActor بود
+        Object delegate = ((Behaviour<IResource>) this).getBehaviourDelegate();
         msg.replyTo.tell(new BehaviorDelegateResponse(delegate));
         return this;
     }
+
+    /**
+     * Registers message handlers related to connection management for the Scanner actor.
+     * <p>
+     * This method configures the ReceiveBuilder to handle various connection lifecycle events,
+     * such as connect, disconnect, and connection status queries.
+     *
+     * @param builder the ReceiveBuilder to which connection message handlers will be added
+     * @return the ReceiveBuilder updated with connection-related handlers
+     */
 
     private ReceiveBuilder<ScannerCommand> connectionHandlers(ReceiveBuilder<ScannerCommand> builder) {
         return builder
@@ -100,6 +112,15 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 .onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
                 .onMessage(ScannerCommand.Disconnect.class, this::onDisconnect);
     }
+    /**
+     * Registers message handlers related to scanning operations for the Scanner actor.
+     * <p>
+     * This method configures the ReceiveBuilder to handle scanning lifecycle commands
+     * such as start, stop, triggering scans, and processing incoming scan messages.
+     *
+     * @param builder the ReceiveBuilder to which scan message handlers will be added
+     * @return the ReceiveBuilder updated with scan-related handlers
+     */
 
     private ReceiveBuilder<ScannerCommand> scanHandlers(ReceiveBuilder<ScannerCommand> builder) {
         return builder
@@ -109,12 +130,30 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 .onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
                 .onMessage(ScannerCommand.OnMessage.class, this::onOnMessage);
     }
+    /**
+     * Registers message handlers for managing event listeners in the Scanner actor.
+     * <p>
+     * This method configures the ReceiveBuilder to handle registration and
+     * unregistration of event listeners that want to receive scanner events.
+     *
+     * @param builder the ReceiveBuilder to which listener management handlers will be added
+     * @return the ReceiveBuilder updated with listener-related handlers
+     */
 
     private ReceiveBuilder<ScannerCommand> listenerHandlers(ReceiveBuilder<ScannerCommand> builder) {
         return builder
                 .onMessage(ScannerCommand.RegisterEventListener.class, this::onRegisterEventListener)
                 .onMessage(ScannerCommand.UnregisterEventListener.class, this::onUnregisterEventListener);
     }
+    /**
+     * Registers message handlers for managing occupation status in the Scanner actor.
+     * <p>
+     * This method configures the ReceiveBuilder to handle commands related to
+     * setting, getting, and querying the occupation state of the scanner.
+     *
+     * @param builder the ReceiveBuilder to which occupation-related handlers will be added
+     * @return the ReceiveBuilder updated with occupation management handlers
+     */
 
     private ReceiveBuilder<ScannerCommand> occupationHandlers(ReceiveBuilder<ScannerCommand> builder) {
         return builder
@@ -122,37 +161,31 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 .onMessage(ScannerCommand.GetOccupation.class, this::onGetOccupation)
                 .onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation);
     }
+    /**
+     * Registers miscellaneous message handlers for the Scanner actor.
+     * <p>
+     * This method adds handlers for less common or auxiliary commands that
+     * don't fit into other specific handler groups.
+     *
+     * @param builder the ReceiveBuilder to which miscellaneous handlers will be added
+     * @return the ReceiveBuilder updated with miscellaneous command handlers
+     */
 
     private ReceiveBuilder<ScannerCommand> miscHandlers(ReceiveBuilder<ScannerCommand> builder) {
         return builder
-                .onMessage(ScannerCommand.Enqueue.class, this::onEnqueue)
-                .onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate);
+                .onMessage(ScannerCommand.Enqueue.class, this::onEnqueue);
+                //.onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate);
     }
-   // @Override
-  //  public Receive<ScannerCommand> createReceive2() {
-     //   return newReceiveBuilder()
-                //.onMessage(ScannerCommand.Connect.class, this::onConnect)
-                //.onMessage(ScannerCommand.OnDisconnect.class, this::onOnDisconnect)
-                //.onMessage(ScannerCommand.OnMessage.class, this::onOnMessage)
-                //.onMessage(ScannerCommand.Enqueue.class, this::onEnqueue)
-                //.onMessage(ScannerCommand.IsConnected.class, this::onIsConnected)
-                //.onMessage(ScannerCommand.IsConnectedToDMCC.class, this::onIsConnectedToDMCC)
-                //.onMessage(ScannerCommand.RegisterEventListener.class, this::onRegisterEventListener)
-                //.onMessage(ScannerCommand.UnregisterEventListener.class, this::onUnregisterEventListener)
-                //.onMessage(ScannerCommand.Start.class, this::onStart)
-                //.onMessage(ScannerCommand.Stop.class, this::onStop)
-                //.onMessage(ScannerCommand.SetOccupation.class, this::onSetOccupation)
-                //.onMessage(ScannerCommand.GetOccupation.class, this::onGetOccupation)
-                //.onMessage(ScannerCommand.SendTrigger.class, this::onSendTrigger)
-                //.onMessage(ScannerCommand.OnConnect.class, this::onOnConnect)
-                //.onMessage(GetBehaviorDelegate.class, this::onGetBehaviorDelegate)
-                //.onSignal(Terminated.class, this::onTerminated)
-                //.onMessage(ScannerCommand.QueryIsConnected.class, this::onQueryIsConnected)
-                //.onMessage(ScannerCommand.Disconnect.class, this::onDisconnect)
-                //.onMessage(ScannerCommand.QueryOccupation.class, this::onQueryOccupation)
-                //.onMessage(ScannerCommand.TriggerScan.class, this::onTriggerScan)
-       //         .build();
-   // }
+
+    /**
+     * Defines the message and signal handlers for this actor.
+     * <p>
+     * This method aggregates all specific handlers for connection management,
+     * scanning operations, listener registration, occupation status, and miscellaneous commands.
+     * It also handles the termination signal.
+     *
+     * @return a Receive instance that handles all registered messages and signals
+     */
 
     @Override
     public Receive<ScannerCommand> createReceive() {
@@ -176,11 +209,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return Behaviors.same();
     }
 
-    private Behavior<ScannerCommand>onQueryOccupation(ScannerCommand.QueryOccupation msg) {
-        msg.replyTo().tell(new ScannerCommand.OccupationStatus(occupation));// This has been created for TEST purpose
-        getContext().getLog().info("📥 [ScannerActor] Received QueryOccupation, responding with {}", occupation);
-        return this;
-    }
+
     private Behavior<ScannerCommand> onDisconnect(ScannerCommand.Disconnect msg) {
         if (dmcc != null && dmcc.connected()) {
 
@@ -188,7 +217,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
                 isRangeObserving = false;
             }
-
             DataManSystem ds = dmcc;
             dmcc = null;
             ds.disconnect(); // بدون try
@@ -198,8 +226,20 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         }
         return this;
     }
+    /**
+     * Handles QueryOccupation command by replying with the current occupation state.
+     * Primarily intended for testing or debugging to verify the actor’s internal occupation status.
+     */
 
-
+    private Behavior<ScannerCommand>onQueryOccupation(ScannerCommand.QueryOccupation msg) {
+        msg.replyTo().tell(new ScannerCommand.OccupationStatus(occupation));
+        getContext().getLog().info("📥 [ScannerActor] Received QueryOccupation, responding with {}", occupation);
+        return this;
+    }
+    /**
+     * Handles GetOccupation command by checking and logging the current occupation status.
+     * Intended for debugging or testing purposes to monitor whether the actor is currently occupied.
+     */
     private Behavior <ScannerCommand> onGetOccupation (ScannerCommand.GetOccupation msg) {
         getContext().getLog().info("Check being Occupied");
         boolean isOccupied = occupation !=null && occupation;
@@ -214,7 +254,16 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         }
         return this;
     }
-
+    /**
+     * Handles the OnDisconnect event, typically triggered after an unexpected disconnection.
+     *
+     * - Stops range observation if active.
+     * - Disconnects from the DMCC system if currently connected.
+     * - Updates the internal state to RECONNECTING and initiates a scheduled reconnect attempt.
+     *
+     * @param msg the OnDisconnect message
+     * @return the current actor behavior
+     */
     private Behavior<ScannerCommand> onOnDisconnect(ScannerCommand.OnDisconnect msg) {
         getContext().getLog().info("Handling OnDisconnect. Current state: {}", connectionState);
 
@@ -222,13 +271,11 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
             isRangeObserving = false;
         }
-
         if (dmcc != null && dmcc.connected()) {
             dmcc.disconnect();
             connected = false;
             getContext().getLog().info("Disconnected from DMCC.");
         }
-
         connectionState = ConnectionState.RECONNECTING;
         retryCount = 1;
         scheduleReconnect();
@@ -236,22 +283,26 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
 
-    //Old Version
-   /* private Behavior<ScannerCommand> onOnDisconnect (ScannerCommand.OnDisconnect msg) {
 
-        getContext().getLog().info("Handling OnDisconnect...");
-        connected=false;
-        return this;
-    }*/
+    /**
+     * Handles the Connect command to initiate a connection to the DMCC system.
+     * <p>
+     * - Skips the process if already connected.
+     * - Updates internal state to CONNECTING and attempts to connect.
+     * - If successful:
+     *     - Updates state to CONNECTED.
+     *     - Notifies the Cognex actor to initiate its own connection.
+     * - If unsuccessful:
+     *     - Sets state to RECONNECTING.
+     *     - Schedules a retry attempt with exponential backoff logic.
+     *
+     * @param msg the Connect command message
+     * @return the current actor behavior
+     */
 
     private Behavior<ScannerCommand> onConnect (ScannerCommand.Connect msg) {
 
         getContext().getLog().info("onConnect() called. Current state: {}", connectionState);
-
-        //Old version
-        /*getContext().getLog().info("is connecting");
-        getContext().getLog().info("onConnect Called");*/
-
 
         if(connectionState == ConnectionState.CONNECTED) {
             getContext().getLog().info("Already connected. Ignoring connect request.");
@@ -279,25 +330,29 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-//        dmcc.connect();
-//        if(dmcc.connect()) {
-//            this.connected=true;
-//            getContext().getLog().info("Hey DMCC is connected");
-//        } else {
-//            getContext().getLog().warn("DMCCC NOT connected");
-//        }
-        //this.connected = true;
         return this;
     }
 
+    /**
+     * Placeholder for handling OnMessage command.
+     * Currently, logs a message for debugging; not yet integrated or used in the system.
+     * Can be extended in the future if message-based processing is required.
+     */
+    // TODO: Evaluate if OnMessage is needed — currently unused and only logs a placeholder.
+    @Deprecated
     private Behavior<ScannerCommand> onOnMessage (ScannerCommand.OnMessage msg) {
         Response response = msg.response();
-        getContext().getLog().info("some Messages 2");
+        getContext().getLog().info("OUR APPROPRIATE MESSAGE ");
         return Behaviors.same();
     }
+
+    /**
+     * Handles Enqueue command by receiving a DTO. Currently, it doesn't process or respond to the message.
+     * The replyTo field is acknowledged but unused — can be used in future implementations if needed.
+     */
     private Behavior<ScannerCommand> onEnqueue (ScannerCommand.Enqueue msg) {
         IDTO dto = msg.dto();
-        ActorRef<Boolean> replyTo = msg.replyTo();   //(What is supposed to do, apparently nothing here)
+        ActorRef<Boolean> replyTo = msg.replyTo();// Currently unused, reserved for future acknowledgment
         return Behaviors.same();
     }
 
@@ -318,7 +373,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         } else {
             logger.warn("Connection failed");
         }
-        // پردازش وضعیت اتصال
+        // Handling connection status
         return this;
     }
     private Behavior<ScannerCommand> onRegisterEventListener (ScannerCommand.RegisterEventListener msg) {
@@ -431,97 +486,61 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
     private Behavior<ScannerCommand> onStart(ScannerCommand.Start msg) {
 
+        if (isStarted) {
+            logger.info("Scanner already started, ignoring duplicate Start command.");
+            return this;
+        }
+
         logger.info("Starting " + getBehaviourDelegate());
 
-                //((IReference) getBehaviourDelegate()).getURI().toString();
-        IReference ref = ((IReference) getBehaviourDelegate() instanceof IReference) ? (IReference)
-        getBehaviourDelegate() : null;
+        IReference ref = (getBehaviourDelegate() instanceof IReference) ? (IReference) getBehaviourDelegate() : null;
         String uri = (ref != null && ref.getURI() != null) ? ref.getURI().toString() : "UNKNOWN";
 
-        /*String host = host();
-        int port = port();*/
         logger.info("Starting DMCC scanner at URI= {} host = {} port= {}", uri, host(), port());
         logger.info("Starting observation for scanner URI = {}", uri);
 
         try {
-            // بررسی اتصال اولیه
+            if (dmcc == null || !dmcc.connected()) {
+                logger.warn("DMCC is not connected, attempting to connect...");
+                getContext().getSelf().tell(new ScannerCommand.Connect());
+                return this;
+            }
+
             Response r = dmcc.sendCommand("UPTIME");
             if (r instanceof Response.NoResponse) {
-                logger.warn("No response from UPTIME, triggering disconnect");
+                logger.warn("No response from UPTIME, triggering disconnect and reconnect.");
                 getContext().getSelf().tell(new ScannerCommand.OnDisconnect());
                 getContext().getSelf().tell(new ScannerCommand.Connect());
                 return this;
             }
             logger.info("UPTIME response = {}", r);
-            // خواندن تنظیمات رنج
-            Optional <Long> rangeMax = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMax");
-            Optional <Long> rangeMin = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
-            Optional <Long> rangeOff = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
 
-            boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
-            if (!checkRange) {
-                logger.info("Range check not configured");
-                return this;
-            }
-            Optional<RangeObserverConfig> rangeConfigOpt =
-                    rangeMin.flatMap(min ->
-                            rangeMax.flatMap(max ->
-                                    rangeOff.map(off -> new RangeObserverConfig(
-                                            dmcc, cmId, min, max, off,
-                                            getContext().getSelf(), uri, config.host, config.port, config.scanReceiver
-                                    ))
-                            )
-                    );
-
-            if (rangeConfigOpt.isPresent()) {
-                RangeObserverConfig rangeConfig = rangeConfigOpt.get();
-                rangeObserverActor = getContext().spawn(
-                        RangeObserverActor.create(rangeConfig),
-                        "rangeObserver-" + cmId
-                );
-                getContext().watch(rangeObserverActor);
-                logger.info("RangeObserverActor created");
-
+            Optional<Long> rangeMax = ScannerUtils.getProperty(delegate, Long.class, "triggerRangeMax");
+            if (rangeMax.isPresent() && rangeObserverActor != null && !isRangeObserving) {
                 rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
                 isRangeObserving = true;
-                logger.info("RangeObserverActor observing started");
-            } else {
-                logger.warn("Range observation skipped — one or more range properties were missing.");
+                logger.info("Started RangeObserver for range max: {}", rangeMax.get());
             }
+            // ✅ فقط در صورتی که همه چیز موفق بود:
+            isStarted = true;
 
-
-        } catch (Throwable t) {
-            logger.error("Failed to start:", t);
+        } catch (IOException e) {
+            logger.error("Error during onStart: ", e);
+            getContext().getSelf().tell(new ScannerCommand.OnDisconnect());
+            // isStarted را نمی‌گذاریم true بماند چون شروع موفق نبود
         }
+
         return this;
-        // اطلاعات اتصال
     }
-
-/*    public   <T> Optional<T> getProperty(Class<T> clazz, String propertyName) {
-        Object value = delegate.getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart(propertyName));
-        if (value == null) return Optional.empty();
-
-        try {
-            if (clazz == Long.class) {
-                return Optional.of(clazz.cast(Long.valueOf(value.toString())));
-            } else if (clazz == Boolean.class) {
-                return Optional.of(clazz.cast(Boolean.valueOf(value.toString())));
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to convert property {} to type {}", propertyName, clazz.getSimpleName(), e);
-        }
-
-        return Optional.empty();
-    }*/
-
-  /*  private <T> T getProperty(Class<T> clazz, String propertyName ) {
-    Object value = ((IResource) getBehaviourDelegate()).getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart
-            (propertyName));
-    if (null== value) return null;
-    if (clazz.isAssignableFrom(Long.class)) return (T) Long.valueOf(value.toString());
-    if (clazz.isAssignableFrom(Boolean.class)) return (T) Boolean.valueOf(value.toString());
-    return null;
-} */
+    /**
+     * Schedules a reconnect attempt with a delay defined by RETRY_INTERVAL.
+     * <p>
+     * If the number of retry attempts exceeds MAX_RETRIES, it logs a warning,
+     * sets the connection state to DISCONNECTED, and stops further retries.
+     * Otherwise, it schedules a reconnect command to be sent to self after the delay.
+     * <p>
+     * Also increments the retry count after each scheduled attempt.
+     */
 
     private void scheduleReconnect() {
         if(retryCount>MAX_RETRIES) {
@@ -529,7 +548,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             connectionState=ConnectionState.DISCONNECTED;
             return;
         }
-
         getContext().getSystem().scheduler().scheduleOnce(
                 RETRY_INTERVAL,
                 ()->getContext().getSelf().tell(new ScannerCommand.Connect()),
@@ -538,7 +556,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 retryCount, RETRY_INTERVAL.getSeconds());
                 retryCount++;
     }
-
 @Override
 public IResource getBehaviourDelegate() {
     return this.delegate;
