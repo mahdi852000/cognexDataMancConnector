@@ -36,27 +36,39 @@ class RangeObserverActorTest {
     static void tearDown() {
         testKit.shutdownTestKit();
     }
+    /**
+     * Tests the complete behavior of the RangeObserverActor when started, ticked, and stopped.
+     * <p>
+     * It verifies:
+     * <ul>
+     *   <li>That the actor sends a scan trigger message when the measured distance is within range</li>
+     *   <li>That occupation is correctly reported to the scanner actor</li>
+     *   <li>That scan triggering stops after receiving a StopObserving command</li>
+     *   <li>That the DataManSystem is correctly invoked to retrieve distance measurements</li>
+     * </ul>
+     */
 
     @Test
     void testRangeObserverActorBehavior() throws IOException {
-        // ساخت mock برای DataManSystem
+        // Create a mock for DataManSystem, which provides distance measurements
         DataManSystem dmccMock = Mockito.mock(DataManSystem.class);
 
-        // ساخت mock برای Response
+        // Create a mock for the response returned by DataManSystem
         Response responseMock = Mockito.mock(Response.class);
 
-        // وقتی sendCommand با هر آرگومانی صدا زده شود، مقدار responseMock را برگردان
+        // Configure the mock system to return the mock response when a command is sent
         when(dmccMock.sendCommand(anyString(), anyInt(), anyBoolean())).thenReturn(responseMock);
 
-        // مقداردهی به متد result در responseMock برای برگرداندن رشته عددی "50"
+        // Simulate a valid response with a numeric distance value "50"
         when(responseMock.result()).thenReturn("50");
 
-        // ساخت actor mock برای scannerActor که پیام‌ها به آن ارسال می‌شود
+        // Create a test probe to observe messages sent to the scanner actor
         TestProbe<ScannerCommand> scannerProbe = testKit.createTestProbe();
 
+        // Create a test probe to receive scan results
         TestProbe<String> scanReceiverProbe = testKit.createTestProbe();
 
-        // ساخت actor تحت تست با مقادیر ورودی فرضی
+        // Build the configuration and spawn the RangeObserverActor with mock dependencies
         RangeObserverConfig config = new RangeObserverConfig(
                 dmccMock, cmId, rangeMin, rangeMax, rangeOff,
                 scannerProbe.getRef(), uri, host, port, scanReceiverProbe.getRef()
@@ -65,59 +77,70 @@ class RangeObserverActorTest {
                 RangeObserverActor.create(config)
         );
 
-        // ارسال پیام StartObserving
+        // Start observing (enables ticking and distance checks)
         rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
 
-        // منتظر بمانیم تا پیام Tick خودکار از timer ارسال شود (یا می‌توانیم مستقیم پیام Tick بفرستیم)
+        // Manually trigger a tick (simulates a distance check)
         rangeObserverActor.tell(new RangeObserverCommand.Tick());
 
-        // حالا انتظار داریم که scannerActor پیام SetOccupation(true) و TriggerScan دریافت کند
+        // Expect the actor to mark itself as occupied
         ScannerCommand.SetOccupation setOcc = scannerProbe.expectMessageClass(ScannerCommand.SetOccupation.class);
         assertTrue(setOcc.occupied());
 
+        // Expect the actor to trigger a scan
         ScannerCommand triggerScan = scannerProbe.expectMessageClass(ScannerCommand.TriggerScan.class);
         assertNotNull(triggerScan);
 
-        // ارسال پیام StopObserving
+        // Stop observing (disables further ticking behavior)
         rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
 
-        // پس از Stop دیگر Tick تاثیری ندارد
+        // Send another Tick, which should now be ignored
         rangeObserverActor.tell(new RangeObserverCommand.Tick());
 
-        // نباید پیام جدید به scannerProbe بیاید
+        // Ensure no further messages are sent after StopObserving
         scannerProbe.expectNoMessage();
 
-        // verify اینکه sendCommand حداقل یکبار صدا زده شده
+        // Verify that sendCommand was called at least once to fetch distance
         verify(dmccMock, atLeastOnce()).sendCommand(anyString(), anyInt(), anyBoolean());
     }
+
+    /**
+     * Verifies that the RangeObserverActor correctly forwards scanned codes
+     * to the configured scan result receiver.
+     * <p>
+     * This test simulates receiving a scan code while the observer is active
+     * and checks that the code is passed to the external receiver as expected.
+     */
+
     @Test
     void testRangeObserverReceivesScanCode() {
-       // TestKitJunitResource testKit = new TestKitJunitResource();
 
-        // ScannerActor mock
+        // Create a test probe to simulate the ScannerActor (receives internal commands)
         TestProbe<ScannerCommand> scannerProbe = testKit.createTestProbe();
 
-        // Probe for receiving scan results
+        // Create a test probe to receive the scan results from the observer
         TestProbe<String> scanResultReceiver = testKit.createTestProbe();
 
+        // Mock the DataManSystem dependency (not used in this test but required for config)
         DataManSystem dmcc = mock(DataManSystem.class);
 
+        // Prepare the actor configuration
         RangeObserverConfig config = new RangeObserverConfig(
                 dmcc, 1, 100L, 200L, 300L,
                 scannerProbe.getRef(), "uri", "host", 1234, scanResultReceiver.getRef()
 
         );
-        // می‌سازیم actor اصلی با رفرنس‌های لازم
+        // Spawn the RangeObserverActor with the given config
         ActorRef<RangeObserverCommand> observer = testKit.spawn(
                 RangeObserverActor.create(config)
         );
        // observer.tell(new RangeObserverCommand.StartObserving());
 
-        // شبیه‌سازی دریافت scan code از ScannerActor
+        // Simulate reception of a scan code by sending ScanCode message
         String scannedCode = "abc123";
         observer.tell(new RangeObserverCommand.ScanCode(scannedCode));
 
-        // بررسی اینکه code به receiver فرستاده شده
+        // Verify that the scan code is forwarded to the receiver
         String receivedCode = scanResultReceiver.receiveMessage();
         assertEquals(scannedCode, receivedCode);
     }

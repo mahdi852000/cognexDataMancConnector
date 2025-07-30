@@ -174,22 +174,33 @@ public class ScannerActorTest {
                 ScannerCommand.TriggerScan.class, Duration.ofSeconds(10));
         assertNotNull(triggerScan);
     }
+    /**
+     * Verifies that the ScannerActor properly cleans up its resources upon receiving a Disconnect command.
+     * <p>
+     * This includes:
+     * - Stopping observation by sending StopObserving to the range observer actor.
+     * - Removing the listener from the DataMan system.
+     * - Calling disconnect on the DataMan system.
+     * <p>
+     * The test uses manual initialization of internal fields (e.g., `connected`, `rangeObserverActor`)
+     * to simulate the actor being in a connected state prior to disconnecting.
+     */
 
     @Test
     void testOnDisconnectShouldCleanupResources() {
-        // ایجاد test probes
+        //creating test probe
         TestProbe<RangeObserverCommand> rangeObserverProbe = testKit.createTestProbe();
         TestProbe<CognexCommand> cognexProbe = testKit.createTestProbe();
 
-        // mock کردن وابستگی‌ها
+        // mocking dependencies
         DataManSystem dmccMock = mock(DataManSystem.class);
         SystemConnector.Listener listenerMock = mock(SystemConnector.Listener.class);
         IResource delegateMock = mock(IResource.class);
 
-        // شبیه‌سازی وضعیت وصل بودن
+        // simulating  an already-connected state
         when(dmccMock.connected()).thenReturn(true);
 
-        // ساخت config
+        // Creating a sample configuration for ScannerActor
         ScannerActorConfig config = new ScannerActorConfig(
                 41,
                 dmccMock,
@@ -202,11 +213,11 @@ public class ScannerActorTest {
                 scanReceiverProbe.getRef(),
                 false
     );
-        // ساخت بازیگر
+        // Spawning the actor with overridden internal state
         Behavior<ScannerCommand> behavior = Behaviors.setup(ctx ->
                 new ScannerActor(ctx, config, cognexProbe.getRef()) {
                     {
-                        // مقداردهی دستی به وضعیت برای تست
+                        // Manually initializing internal state for test
                         this.connected = true;
                         this.rangeObserverActor = rangeObserverProbe.getRef();
                         this.isRangeObserving = true;
@@ -215,17 +226,18 @@ public class ScannerActorTest {
         );
         ActorRef<ScannerCommand> actor = testKit.spawn(behavior);
 
-        // ارسال پیام Disconnect
+        // Sending the Disconnect command
         actor.tell(new ScannerCommand.Disconnect());
 
-        // بررسی ارسال StopObserving به rangeObserver
+        // Verifying that StopObserving was sent to the range observer
         rangeObserverProbe.expectMessageClass(RangeObserverCommand.StopObserving.class);
 
-        // بررسی فراخوانی removeListener و disconnect
+        // Verifying listener removal and disconnect calls on the DataMan system
         verify(dmccMock).removeListener(listenerMock);
         verify(dmccMock).disconnect();
-        // چون فیلد connected خصوصی‌ست، مستقیم نمی‌شه بررسی کرد، اما می‌تونیم فرض کنیم اگر
-        // disconnect و removeListener صدا زده شده، کار انجام شده
+        // Since `connected` is a private field, we can't verify it directly.
+        // However, calling `disconnect` and `removeListener` implies it was handled correctly.
+
     }
 
     // Dummy implementations

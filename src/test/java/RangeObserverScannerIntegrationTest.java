@@ -34,6 +34,14 @@ public class RangeObserverScannerIntegrationTest {
     static void cleanup(){
         testKit.shutdownTestKit();
     }
+    /**
+     * Verifies that the RangeObserverActor stops sending scan trigger commands
+     * after receiving a StopObserving message.
+     * <p>
+     * This test simulates a distance sensor reading and ensures that the actor
+     * initially triggers a scan, then stops doing so once observation is halted.
+     * It helps validate the correctness of start/stop behavior in periodic scanning logic.
+     */
 
     @Test
     void shouldStopTriggeringScanWhenStopped() throws InterruptedException {

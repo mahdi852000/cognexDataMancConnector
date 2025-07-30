@@ -87,11 +87,11 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
 
     /**
      * Handles a scanned code notification from the scanner.
-     *
+     * <p>
      * This method receives a NotifyScannedCode message containing the scanned code
      * and the scanner's resource ID. It then notifies all registered listeners
      * by sending them a CodeScanned event.
-     *
+     * <p>
      * This is the only method in this actor that processes scanned codes.
      *
      * @param msg the scanned code notification containing the resource and code

@@ -47,10 +47,16 @@ public class ScannerUtilsTest {
 
     }
 
+    /**
+     * Verifies that ScannerUtils.getProperty correctly retrieves and parses a boolean value.
+     * <p>
+     * Since ScannerUtils internally converts the given property key ("heartbeat") to an IReference,
+     * the test mocks the expected IReference derived from that key to simulate resource access.
+     * Ensures that a "true" string value is parsed into a boolean true.
+     */
 
     @Test
     void testGetProperty_ReturnsBooleanValue() {
-        // چون ScannerUtils خودش string رو به IReference تبدیل می‌کنه، باید روی IReference ساخته‌شده از "heartbeat" mock کنیم
         IReference expectedRef = LOGISTICS.NAMAESPACE_URI.appendLocalPart("heartbeat");
         when(mockResource.getSingle(expectedRef)).thenReturn("true");
 

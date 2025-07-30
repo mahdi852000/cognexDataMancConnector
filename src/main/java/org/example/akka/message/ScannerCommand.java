@@ -31,14 +31,15 @@ public interface ScannerCommand {
     }
     public record Disconnect() implements ScannerCommand{}
 
-    //TriggerScan for Test Purpose
+    // Message used in tests to simulate a scan trigger without real hardware interaction.
+    // Sending this message to ScannerActor should result in emitting a fake scan result.
     public record TriggerScan() implements ScannerCommand {}
 
 
     public interface ScannerEventListener{
-        public void onOccupationChange(ScannerCommand scannerCommand , boolean occupied);
+        /*public void onOccupationChange(ScannerCommand scannerCommand , boolean occupied);
         public void onCodeScanned(ScannerCommand scannerCommand , String code);
-
+*/
     }
 
 }
