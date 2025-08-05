@@ -17,6 +17,7 @@ public class ScannerActorConfig {
     public final boolean isExternalDmcc;
     public final ActorRef<String> scanReceiver;
     public final boolean useCheckSum;
+    public final ActorRef<RangeObserverCommand> rangeObserverActor;
 
 
     public ScannerActorConfig(
@@ -29,7 +30,8 @@ public class ScannerActorConfig {
             ActorRef<CognexCommand> cognexActor,
             boolean isExternalDmcc,
             ActorRef<String> scanReceiver,
-            boolean useCheckSum
+            boolean useCheckSum,
+            ActorRef<RangeObserverCommand> rangeObserverActor
     ) {
         this.cmId = cmId;
         this.dmcc = dmcc;
@@ -41,5 +43,23 @@ public class ScannerActorConfig {
         this.isExternalDmcc = isExternalDmcc;
         this.scanReceiver = scanReceiver;
         this.useCheckSum = useCheckSum;
+        this.rangeObserverActor = rangeObserverActor; // for test
     }
+
+    public ScannerActorConfig(
+            int cmId,
+            DataManSystem dmcc,
+            SystemConnector.Listener listener,
+            IResource delegate,
+            String host,
+            int port,
+            ActorRef<CognexCommand> cognexActor,
+            boolean isExternalDmcc,
+            ActorRef<String> scanReceiver,
+            boolean useCheckSum) {
+            this(cmId, dmcc, listener, delegate, host, port, cognexActor,
+                isExternalDmcc, scanReceiver, useCheckSum, null); // default value
+    }
+
+
 }

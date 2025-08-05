@@ -42,7 +42,7 @@ public class RangeObserverReliabilityTest {
 
         // کانفیگ ساختگی
         RangeObserverConfig config = new RangeObserverConfig(
-                new FakeDataManSystem(50),
+                new FakeDataManSystem(50,testKit.createTestProbe(String.class).getRef()),
                 123,
                 10L,
                 100L,
@@ -82,7 +82,7 @@ public class RangeObserverReliabilityTest {
         observer.tell(new RangeObserverCommand.Tick());
 
         // کمی صبر برای ریست شدن actor
-        Thread.sleep(1000);
+        Thread.sleep(2000);
 
         // حالا پیام Start باید دریافت و اجرا بشه (یعنی بازیگر دوباره زنده شده)
         observer.tell(new RangeObserverCommand.StartObserving());

@@ -34,7 +34,6 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
         this.cmId = config.cmId;
     }
 
-
     public static Behavior<RangeObserverCommand> create(RangeObserverConfig config) {
         return Behaviors.withTimers(timers->
                 Behaviors.setup(
@@ -57,7 +56,7 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
             ActorRef<String> scanReceiver,
             Duration tickInterval) {
 
-        FakeDataManSystem fakeDmcc = new FakeDataManSystem(simulatedDistance);
+        FakeDataManSystem fakeDmcc = new FakeDataManSystem(simulatedDistance, scanReceiver);
         RangeObserverConfig config = new RangeObserverConfig(
                                 fakeDmcc,
                                 0,

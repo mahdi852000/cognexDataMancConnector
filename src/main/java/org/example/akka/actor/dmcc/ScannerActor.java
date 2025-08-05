@@ -171,8 +171,13 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
     private Behavior<ScannerCommand>onTriggerScan(ScannerCommand.TriggerScan msg) {
         logger.info("Scanner triggered to scan.");
+        if (config.scanReceiver != null) {
+            config.scanReceiver.tell("SCAN_CODE_FROM_ACTOR");
+        }
         // یا انجام عملیات دلخواه
-        rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
+        if (rangeObserverActor !=null) {
+            rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
+        }
         return Behaviors.same();
     }
 
@@ -211,6 +216,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         boolean occupied = msg.occupied();
         if(null==occupation || occupied!=occupation ){
             occupation = occupied;
+            listener.onOccupationChanged(occupied);
         }
         return this;
     }
@@ -297,7 +303,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     }
     private Behavior<ScannerCommand> onEnqueue (ScannerCommand.Enqueue msg) {
         IDTO dto = msg.dto();
-        ActorRef<Boolean> replyTo = msg.replyTo();   //(What is supposed to do, apparently nothing here)
+        ActorRef<Boolean> replyTo = msg.replyTo();//(What is supposed to do, apparently nothing here)
+        replyTo.tell(true);
         return Behaviors.same();
     }
 
@@ -415,6 +422,11 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 if(null!=dmcc){
                     dmcc.connect();
                 }
+            }
+
+            @Override
+            public void onOccupationChanged(boolean occupied) {
+
             }
         };
         dmcc.addListener(listener);
@@ -554,3 +566,5 @@ public IResource getBehaviourDelegate() {
         return this.config.port;
     }
 }
+
+

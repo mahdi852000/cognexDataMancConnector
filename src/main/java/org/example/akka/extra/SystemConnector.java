@@ -21,5 +21,6 @@ public interface SystemConnector {
         void onMessage(Response response);
         void onConnect();
         void onDisconnect();
+        void onOccupationChanged(boolean occupied);
     }
 }

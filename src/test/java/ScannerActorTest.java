@@ -179,6 +179,7 @@ public class ScannerActorTest {
         public void onMessage(Response response) {}
         public void onConnect() {}
         public void onDisconnect() {}
+        public void onOccupationChanged(boolean occupied){};
     }
 
     static class DummyDMCC extends DataManSystem {
