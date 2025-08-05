@@ -214,7 +214,7 @@ public class ScannerActorReliabilityTest {
         return ScannerActor.create(new ScannerActorConfig(
                 1,
                 new FakeDataManSystem(50, testKit.createTestProbe(String.class).getRef()),
-                new ScannerActorTest.DummyListener(), // می‌تونی پروب بذاری اینجا اگه لازم شد
+                new ScannerActorTest.DummyListener(),
                 new ScannerActorTest.DummyResource(),
                 "localhost",
                 5000,
