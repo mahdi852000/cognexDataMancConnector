@@ -1,19 +1,18 @@
 package org.example.akka.message;
-
-import akka.actor.typed.ActorRef;
-import org.example.akka.event.SystemEvent;
 import org.example.akka.extra.IResource;
 
 public interface CognexCommand {
-    public record Start() implements CognexCommand {}
-    public record Stop() implements CognexCommand {}
-    public record Connect() implements CognexCommand {}
-    public record Disconnect() implements CognexCommand {}
-    public record SetOccupation(boolean occupied) implements CognexCommand {}
-    public record NotifyScannedCode(IResource resource, String code) implements CognexCommand {}
+    /*record Start() implements CognexCommand {}
+    record Stop() implements CognexCommand {}
+    record Disconnect() implements CognexCommand {}
+    record SetOccupation(boolean occupied) implements CognexCommand {}
+    record RegisterListener(ActorRef<SystemEvent.CognexEvent> listener) implements CognexCommand {}
+    record UnregisterListener(ActorRef<SystemEvent.CognexEvent> listener) implements CognexCommand {}
+    */
+    record Connect() implements CognexCommand {}
+    record NotifyScannedCode(IResource resource, String code) implements CognexCommand {}
 
 
-    public record RegisterListener(ActorRef<SystemEvent.CognexEvent> listener) implements CognexCommand {}
-    public record UnregisterListener(ActorRef<SystemEvent.CognexEvent> listener) implements CognexCommand {}
+
 }
 

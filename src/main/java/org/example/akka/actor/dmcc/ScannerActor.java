@@ -78,14 +78,14 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         this.cognexActor = cognexActor;
 
     }
-    public static Behavior<ScannerCommand> create(ScannerActorConfig config)   {
-        return Behaviors.setup(ctx->
-                new ScannerActor(ctx,config, config.cognexActor));
+        public static Behavior<ScannerCommand> create(ScannerActorConfig config)   {
+            return Behaviors.setup(ctx->
+                    new ScannerActor(ctx,config, config.cognexActor));
 
-    }
+        }
 
     private Behavior<ScannerCommand> onGetBehaviorDelegate(GetBehaviorDelegate msg) {
-        Object delegate = ((Behaviour<IResource>) this).getBehaviourDelegate(); // اگه this کلاس ScannerActor بود
+        Object delegate = ((Behaviour<IResource>) this).getBehaviourDelegate();
         msg.replyTo.tell(new BehaviorDelegateResponse(delegate));
         return this;
     }
@@ -196,7 +196,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
             DataManSystem ds = dmcc;
             dmcc = null;
-            ds.disconnect(); // بدون try
+            ds.disconnect();
             ds.removeListener(listener);
             connected = false;
             logger.info("DMCC disconnected and listener removed");
@@ -304,7 +304,10 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     private Behavior<ScannerCommand> onEnqueue (ScannerCommand.Enqueue msg) {
         IDTO dto = msg.dto();
         ActorRef<Boolean> replyTo = msg.replyTo();//(What is supposed to do, apparently nothing here)
+        getContext().getLog().info("Received Enqueue command with DTO: {}", dto);
         replyTo.tell(true);
+        getContext().getLog().info("Enqueue result sent: true");
+
         return Behaviors.same();
     }
 
@@ -325,7 +328,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         } else {
             logger.warn("Connection failed");
         }
-        // پردازش وضعیت اتصال
         return this;
     }
     private Behavior<ScannerCommand> onRegisterEventListener (ScannerCommand.RegisterEventListener msg) {
@@ -340,7 +342,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
         ScannerCommand.ScannerEventListener listener = msg.listener();
         if (listener != null) {
-            listeners.remove(listener); // معادل نسخه کلاسیک
+            listeners.remove(listener);
             getContext().getLog().info("Listener unregistered: {}", listener);
         }
         return this;
@@ -436,7 +438,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
     private Behavior<ScannerCommand> onQueryIsConnected(ScannerCommand.QueryIsConnected msg) {
-        boolean status = dmcc != null && dmcc.connected(); // همون منطق متد قبلی isConnected()
+        boolean status = dmcc != null && dmcc.connected();
         msg.replyTo().tell(new ScannerCommand.ConnectedStatus(this.connected));
         return this;
     }
@@ -465,7 +467,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 return this;
             }
             logger.info("UPTIME response = {}", r);
-            // خواندن تنظیمات رنج
+
             Optional <Long> rangeMax = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMax");
             Optional <Long> rangeMin = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
             Optional <Long> rangeOff = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
@@ -506,9 +508,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             logger.error("Failed to start:", t);
         }
         return this;
-        // اطلاعات اتصال
     }
-
 /*    public   <T> Optional<T> getProperty(Class<T> clazz, String propertyName) {
         Object value = delegate.getSingle(LOGISTICS.NAMAESPACE_URI.appendLocalPart(propertyName));
         if (value == null) return Optional.empty();
@@ -541,7 +541,6 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             connectionState=ConnectionState.DISCONNECTED;
             return;
         }
-
         getContext().getSystem().scheduler().scheduleOnce(
                 RETRY_INTERVAL,
                 ()->getContext().getSelf().tell(new ScannerCommand.Connect()),

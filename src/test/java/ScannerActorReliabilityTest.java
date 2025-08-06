@@ -6,9 +6,7 @@ import org.example.akka.actor.dmcc.RangeObserverActor;
 import org.example.akka.actor.dmcc.ScannerActor;
 import org.example.akka.config.RangeObserverConfig;
 import org.example.akka.config.ScannerActorConfig;
-import org.example.akka.extra.FakeDataManSystem;
-import org.example.akka.extra.IResource;
-import org.example.akka.extra.SystemConnector;
+import org.example.akka.extra.*;
 import org.example.akka.message.*;
 import org.junit.jupiter.api.*;
 import static org.mockito.Mockito.*;
@@ -76,7 +74,7 @@ public class ScannerActorReliabilityTest {
                         1,
                         new FakeDataManSystem(50, testKit.createTestProbe(String.class).getRef()),
                         listener,
-                        new ScannerActorTest.DummyResource(),
+                        new DummyResource(),
                         "localhost",
                         5000,
                         testKit.createTestProbe(CognexCommand.class).getRef(),
@@ -126,8 +124,8 @@ public class ScannerActorReliabilityTest {
         ScannerActorConfig config = new ScannerActorConfig(
                 1,
                 new FakeDataManSystem(50, probe.getRef()),  // Simulated scan delay
-                new ScannerActorTest.DummyListener(),                   // Optional stub listener
-                new ScannerActorTest.DummyResource(),                   // Optional stub resource
+                new DummyListener(),                   // Optional stub listener
+                new DummyResource(),                   // Optional stub resource
                 "localhost",
                 5000,
                 cognexCommandProbe.getRef(),
@@ -152,32 +150,70 @@ public class ScannerActorReliabilityTest {
         // Assert and print the result
         assertNotNull(scanResult);
         System.out.println("Received scan result: " + scanResult);
+        assertEquals("SCAN_CODE_FROM_ACTOR", scanResult);
+
     }
     /**
-     * Verifies the correct behavior of the ScannerActor's connect/disconnect flow.
+     * Tests the connect-disconnect flow of the ScannerActor with a simulated retry mechanism.
      * <p>
-     * The test spawns a ScannerActor, sends it a Connect followed by a Disconnect command,
-     * and then queries its connection status.
-     * <p>
-     * The test asserts that:
-     *   - The actor correctly transitions from connected to disconnected state.
-     *   - The final reported connection status is false.
-     * <p>
-     * This test ensures the actor handles lifecycle state transitions properly,
-     * which is important for managing scanner availability and resource cleanup.
+     * The test simulates a failure on the first connection attempt and a successful
+     * connection on the second attempt. It then verifies that after disconnecting,
+     * the actor reports it is no longer connected.
      */
-
     @Test
-    public void testConnectDisconnectFlow() {
+    public void testConnectDisconnectFlow_withRetrySuccess() throws InterruptedException {
         TestProbe<String> dummyReceiver = testKit.createTestProbe();
-        ActorRef<ScannerCommand> scannerActor = testKit.spawn(createTestScannerActor(testKit, dummyReceiver.ref()));
 
+
+        DataManSystem retryingDmcc = new DataManSystem(new DummyConnector()) {
+            private boolean firstAttempt = true;
+            private boolean connected = false;
+
+            @Override
+            public boolean connect() {
+                if (firstAttempt) {
+                    firstAttempt = false;
+                    System.out.println("Simulated failure on first connect");
+                    return false;
+                }
+                connected = true;
+                System.out.println("Simulated success on second connect");
+                return true;
+            }
+
+            @Override
+            public boolean connected() {
+                return connected;
+            }
+
+
+            public Response send(Request request) {
+                return new Response("140", false, request.getId());
+            }
+
+            @Override
+            public Response sendCommand(String command, Integer id, boolean log) {
+                return new Response("140", false, id);
+            }
+        };
+        ScannerActorConfig config = new ScannerActorConfig(
+                1,
+                retryingDmcc,
+                new DummyListener(),
+                new DummyResource(),
+                "localhost",
+                5000,
+                testKit.createTestProbe(CognexCommand.class).getRef(),
+                true,
+                dummyReceiver.ref(),
+                false
+        );
+        ActorRef<ScannerCommand> scannerActor = testKit.spawn(ScannerActor.create(config));
         scannerActor.tell(new ScannerCommand.Connect());
+        Thread.sleep(2500);
         scannerActor.tell(new ScannerCommand.Disconnect());
-
         TestProbe<ScannerCommand.ConnectedStatus> replyProbe = testKit.createTestProbe();
         scannerActor.tell(new ScannerCommand.QueryIsConnected(replyProbe.ref()));
-
         ScannerCommand.ConnectedStatus status = replyProbe.receiveMessage();
         assertNotNull(status);
         assertFalse(status.status());
@@ -205,17 +241,20 @@ public class ScannerActorReliabilityTest {
         scannerActor.tell(new ScannerCommand.Enqueue(dummyDto, replyProbe.ref()));
 
         Boolean response = replyProbe.receiveMessage(Duration.ofSeconds(1));
+        System.out.println("Enqueue response received: " + response);
+
         assertNotNull(response);
         assertTrue(response);
     }
 
-    public static Behavior<ScannerCommand> createTestScannerActor(ActorTestKit testKit, ActorRef<String> dummyReceiver
-                                                                  ) {
+    public static Behavior<ScannerCommand> createTestScannerActor(ActorTestKit testKit,
+                                                                  ActorRef<String> dummyReceiver
+                                        ) {
         return ScannerActor.create(new ScannerActorConfig(
                 1,
                 new FakeDataManSystem(50, testKit.createTestProbe(String.class).getRef()),
-                new ScannerActorTest.DummyListener(),
-                new ScannerActorTest.DummyResource(),
+                new DummyListener(),
+                new DummyResource(),
                 "localhost",
                 5000,
                 testKit.createTestProbe(CognexCommand.class).getRef(),
@@ -224,6 +263,16 @@ public class ScannerActorReliabilityTest {
                 false
         ));
     }
+
+   /* private Behavior<ScannerCommand> createTestScannerActor(
+            ActorTestKit testKit,
+            ActorRef<String> receiver,
+            DataManSystem dmcc
+    ) {
+        ScannerActorConfig config = new ScannerActorConfig(()->dmcc,receiver)
+        return ScannerActor.create(() -> dmcc, receiver);
+    }*/
+
     /**
      * Tests the behavior of mocked IResource and its associated references.
      * <p>
