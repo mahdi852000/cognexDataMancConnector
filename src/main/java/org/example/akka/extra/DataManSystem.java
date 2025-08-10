@@ -27,6 +27,5 @@ public class DataManSystem {
     public Response sendCommand(String command) throws IOException {
         return sendCommand(command,null, false);
     }
-
     public boolean disconnect() {return conn.disconnect();}
 }

@@ -174,7 +174,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         if (config.scanReceiver != null) {
             config.scanReceiver.tell("SCAN_CODE_FROM_ACTOR");
         }
-        // یا انجام عملیات دلخواه
+
         if (rangeObserverActor !=null) {
             rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
         }
@@ -367,6 +367,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     }
     private Behavior<ScannerCommand> onSendTrigger (ScannerCommand.SendTrigger msg) {
         if(connected){
+
             getContext().getLog().info("DMCC is connected, sending trigger...");
         } else {
             getContext().getLog().info("DMCC is NOT connected. Trigger skipped.");
@@ -443,7 +444,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         return this;
     }
 
-    private Behavior<ScannerCommand> onStart(ScannerCommand.Start msg) {
+    private Behavior<ScannerCommand>onStart(ScannerCommand.Start msg) {
 
         logger.info("Starting " + getBehaviourDelegate());
 
@@ -457,8 +458,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         logger.info("Starting DMCC scanner at URI= {} host = {} port= {}", uri, host(), port());
         logger.info("Starting observation for scanner URI = {}", uri);
 
-        try {
-            // بررسی اتصال اولیه
+        try {   
             Response r = dmcc.sendCommand("UPTIME");
             if (r instanceof Response.NoResponse) {
                 logger.warn("No response from UPTIME, triggering disconnect");
