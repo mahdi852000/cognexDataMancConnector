@@ -126,14 +126,14 @@ public class RangeObserverActor extends AbstractBehavior<RangeObserverCommand> {
                     occupation = true;
                     config.scannerActor.tell(new ScannerCommand.SetOccupation(true));
 
-                    config.scanReceiver.tell(String.valueOf(measurement));
+                   // config.scanReceiver.tell(String.valueOf(measurement));
 
                     //For Debugging
                     getContext().getLog().info("Trigger condition met. Sending TriggerScan...");
 
 
 
-                    config.scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
+                   // config.scannerActor.tell(new ScannerCommand.TriggerScan()); //This is my Question! is this what we want?
 
                     getContext().getLog().info("Occupation changed to ON");
                 }

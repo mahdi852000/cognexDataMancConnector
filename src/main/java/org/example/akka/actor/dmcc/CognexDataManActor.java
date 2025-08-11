@@ -37,6 +37,20 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
                 .onMessage(RegisterListener.class, this::onRegisterListener)
                 .onMessage(UnregisterListener.class, this::onUnregisterListener)*/
                 .onMessage(NotifyScannedCode.class, this::onNotifyScannedCode)
+                .onMessage(CognexCommand.RegisterListener.class, msg -> {
+                    listeners.add(msg.listener());
+                    getContext().watchWith(msg.listener(), new CognexCommand.ListenerDied(msg.listener()));
+                    return this;
+                })
+                .onMessage(CognexCommand.UnregisterListener.class, msg -> {
+                    listeners.remove(msg.listener());
+                    return this;
+                })
+                .onMessage(CognexCommand.ListenerDied.class, msg -> {
+                    listeners.remove(msg.listener());
+                    return this;
+                })
+
                 .build();
     }
 
@@ -77,10 +91,15 @@ public class CognexDataManActor extends AbstractBehavior<CognexCommand> {
 
     //This is the only Method which is used
     private Behavior<CognexCommand> onNotifyScannedCode(CognexCommand.NotifyScannedCode msg) {
-        for(ActorRef<SystemEvent.CognexEvent> listener:listeners) {
-            listener.tell(new SystemEvent.CognexEvent.CodeScanned(msg.resource(),msg.code()));
+        if (msg.code() == null || msg.code().isBlank()) {
+            getContext().getLog().warn("Empty or null code received, ignoring.");
+            return this; //
+        }
+        for (ActorRef<SystemEvent.CognexEvent> listener : listeners) {
+            listener.tell(new SystemEvent.CognexEvent.CodeScanned(msg.resource(), msg.code()));
         }
         return this;
     }
+
 
 }

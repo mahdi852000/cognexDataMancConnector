@@ -48,6 +48,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
     boolean useCheckSum = false;
     public final ActorRef<CognexCommand> cognexActor;
+    private boolean triggeredWhileOccupied = false;
+
 
 
     private enum ConnectionState {
@@ -176,6 +178,7 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
         }
 
         if (rangeObserverActor !=null) {
+            //Is this a good place for starting StartObserving? or do we really need it here?
             rangeObserverActor.tell( new RangeObserverCommand.StartObserving());
         }
         return Behaviors.same();
@@ -196,8 +199,10 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
             DataManSystem ds = dmcc;
             dmcc = null;
-            ds.disconnect();
+
             ds.removeListener(listener);
+            ds.disconnect();
+
             connected = false;
             logger.info("DMCC disconnected and listener removed");
         }
@@ -214,9 +219,18 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
 
     private Behavior<ScannerCommand> onSetOccupation(ScannerCommand.SetOccupation msg) {
         boolean occupied = msg.occupied();
-        if(null==occupation || occupied!=occupation ){
+
+        if (occupation == null || occupied != occupation) {
             occupation = occupied;
             listener.onOccupationChanged(occupied);
+
+            if (occupied && connected && !triggeredWhileOccupied) {
+                getContext().getSelf().tell(new ScannerCommand.TriggerScan());
+                triggeredWhileOccupied = true;
+            }
+            if (!occupied) {
+                triggeredWhileOccupied = false;
+            }
         }
         return this;
     }
@@ -440,9 +454,19 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
     }
     private Behavior<ScannerCommand> onQueryIsConnected(ScannerCommand.QueryIsConnected msg) {
         boolean status = dmcc != null && dmcc.connected();
-        msg.replyTo().tell(new ScannerCommand.ConnectedStatus(this.connected));
+        msg.replyTo().tell(new ScannerCommand.ConnectedStatus(status));
         return this;
     }
+    // BUG: QueryIsConnected replies with 'this.connected'
+    //instead of the freshly computed 'status'.
+    //If 'this.connected' is out of sync with the actual DMCC link, the response can be stale/incorrect.
+    // FIX: reply with the computed 'status' (dmcc != null && dmcc.connected()).
+
+    /*private Behavior<ScannerCommand> onQueryIsConnected(ScannerCommand.QueryIsConnected msg) {
+        boolean status = dmcc != null && dmcc.connected();
+        msg.replyTo().tell(new ScannerCommand.ConnectedStatus(this.connected));
+        return this;
+    }*/
 
     private Behavior<ScannerCommand>onStart(ScannerCommand.Start msg) {
 
@@ -472,11 +496,24 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
             Optional <Long> rangeMin = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeMin");
             Optional <Long> rangeOff = org.example.akka.utils.ScannerUtils.getProperty(delegate,Long.class, "triggerRangeOff");
 
-            boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
+
+
+            boolean checkRange = rangeMin.isPresent() && rangeMax.isPresent() && rangeOff.isPresent();
             if (!checkRange) {
                 logger.info("Range check not configured");
                 return this;
             }
+            // BUG: Optional variables (rangeMin/rangeMax/rangeOff) are checked against null.
+            // Optionals are never null, so this condition is always true and may start range
+            // observation with missing config.
+            // FIX: use .isPresent() on each Optional and proceed only when all are present.
+
+            /*boolean checkRange = rangeMin != null && rangeMax != null && rangeOff != null;
+            if (!checkRange) {
+                logger.info("Range check not configured");
+                return this;
+            }*/
+
             Optional<RangeObserverConfig> rangeConfigOpt =
                     rangeMin.flatMap(min ->
                             rangeMax.flatMap(max ->
@@ -495,6 +532,8 @@ public class ScannerActor extends AbstractBehavior<ScannerCommand> implements Be
                 );
                 getContext().watch(rangeObserverActor);
                 logger.info("RangeObserverActor created");
+
+                triggeredWhileOccupied = false;
 
                 rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
                 isRangeObserving = true;
