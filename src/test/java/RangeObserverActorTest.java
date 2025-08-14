@@ -39,25 +39,25 @@ class RangeObserverActorTest {
 
     @Test
     void testRangeObserverActorBehavior() throws IOException {
-        // ساخت mock برای DataManSystem
+   
         DataManSystem dmccMock = Mockito.mock(DataManSystem.class);
 
-        // ساخت mock برای Response
+      
         Response responseMock = Mockito.mock(Response.class);
 
-        // وقتی sendCommand با هر آرگومانی صدا زده شود، مقدار responseMock را برگردان
+        
         when(dmccMock.sendCommand(anyString(), anyInt(), anyBoolean())).thenReturn(responseMock);
 
-        // مقداردهی به متد result در responseMock برای برگرداندن رشته عددی "50"
+      
         when(responseMock.result()).thenReturn("50");
 
-        // ساخت actor mock برای scannerActor که پیام‌ها به آن ارسال می‌شود
+        
         TestProbe<ScannerCommand> scannerProbe = testKit.createTestProbe();
 
         TestProbe<String> scanReceiverProbe = testKit.createTestProbe();
 
 
-        // ساخت actor تحت تست با مقادیر ورودی فرضی
+    
         RangeObserverConfig config = new RangeObserverConfig(
                 dmccMock, cmId, rangeMin, rangeMax, rangeOff,
                 scannerProbe.getRef(), uri, host, port, scanReceiverProbe.getRef()
@@ -66,20 +66,20 @@ class RangeObserverActorTest {
                 RangeObserverActor.create(config)
         );
 
-        // ارسال پیام StartObserving
+       
         rangeObserverActor.tell(new RangeObserverCommand.StartObserving());
 
-        // منتظر بمانیم تا پیام Tick خودکار از timer ارسال شود (یا می‌توانیم مستقیم پیام Tick بفرستیم)
+       
         rangeObserverActor.tell(new RangeObserverCommand.Tick());
 
-        // حالا انتظار داریم که scannerActor پیام SetOccupation(true) و TriggerScan دریافت کند
+       
         ScannerCommand.SetOccupation setOcc = scannerProbe.expectMessageClass(ScannerCommand.SetOccupation.class);
         assertTrue(setOcc.occupied());
 
         ScannerCommand triggerScan = scannerProbe.expectMessageClass(ScannerCommand.TriggerScan.class);
         assertNotNull(triggerScan);
 
-        // ارسال پیام StopObserving
+        // اارسال پیام StartObsesrving
         rangeObserverActor.tell(new RangeObserverCommand.StopObserving());
 
         // پس از Stop دیگر Tick تاثیری ندارد
