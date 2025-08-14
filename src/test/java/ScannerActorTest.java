@@ -59,7 +59,7 @@ public class ScannerActorTest {
                 fakeCognexActor.getRef(),
                 true,
                 scanReceiverProbe.getRef(),
-                false // useCheckSum مقدار دلخواه
+                false // useCheckSum(Deisred Vaulue)
         );
 
         return testKit.spawn(
@@ -166,9 +166,9 @@ public class ScannerActorTest {
             }
         };
 
-        // ساخت IReference mock
+    
 
-        // ساخت IResource mock و پیاده‌سازی getSingle
+        
         IResource mockResource = mock(IResource.class);
         when(mockResource.getSingle(any())).thenReturn(mockRef);
         when(mockResource.getReference()).thenReturn(mockRef);
@@ -176,7 +176,7 @@ public class ScannerActorTest {
 
         when(mockResource.getURI()).thenReturn(mockUri);
 
-        // حالا ScannerActor رو بساز
+   
         TestProbe<ScannerCommand.ConnectedStatus> probe = testKit.createTestProbe();
         TestProbe<CognexCommands.CognexCommand> fakeCognexActor =
                 testKit.createTestProbe(CognexCommands.CognexCommand.class);
@@ -202,13 +202,13 @@ public class ScannerActorTest {
         );
 
 
-        // تست اصلی
+     
         scannerActor.tell(new ScannerCommand.OnConnect());
 
         fakeCognexActor.awaitAssert(Duration.ofSeconds(3), () -> {
             scannerActor.tell(new ScannerCommand.QueryIsConnected(probe.getRef()));
             ScannerCommand.ConnectedStatus status = probe.receiveMessage();
-            assertTrue(status.status()); // اگر true نباشد، خودش چند بار retry می‌کند
+            assertTrue(status.status()); 
             return null;
         });
 
@@ -386,22 +386,21 @@ public class ScannerActorTest {
 
     @Test
     public void testOnDisconnectShouldUpdateConnectionStatus() {
-        // ابتدا بازیگر اسکنر را با وضعیت متصل ساخته و متصل کنیم
+       
         scannerActor = spawnScannerActor(new DummyListener());
 
-        // ابتدا اتصال را شبیه‌سازی می‌کنیم (می‌توانیم پیام OnConnect بفرستیم)
+       
         scannerActor.tell(new ScannerCommand.OnConnect());
 
-        // چک می‌کنیم که وضعیت اتصال true شده
         TestProbe<ScannerCommand.ConnectedStatus> probe = testKit.createTestProbe();
         scannerActor.tell(new ScannerCommand.QueryIsConnected(probe.getRef()));
         ScannerCommand.ConnectedStatus status = probe.receiveMessage();
         assertTrue(status.status(), "Scanner should be connected after OnConnect");
 
-        // حالا پیام قطع اتصال را می‌فرستیم
+       
         scannerActor.tell(new ScannerCommand.OnDisconnect());
 
-        // دوباره وضعیت اتصال را می‌پرسیم و انتظار داریم false باشد
+       
         scannerActor.tell(new ScannerCommand.QueryIsConnected(probe.getRef()));
         ScannerCommand.ConnectedStatus disconnectedStatus = probe.receiveMessage();
         assertFalse(disconnectedStatus.status(), "Scanner should be disconnected after OnDisconnect");
